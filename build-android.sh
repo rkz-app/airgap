@@ -15,24 +15,36 @@ if [ -z "$ANDROID_NDK_HOME" ]; then
     exit 1
 fi
 
+# Detect host platform for NDK toolchain
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    NDK_HOST="linux-x86_64"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    NDK_HOST="darwin-x86_64"
+else
+    echo "Error: Unsupported platform: $OSTYPE"
+    exit 1
+fi
+
+echo "Using NDK host platform: $NDK_HOST"
+
 # Create cargo config for Android
 mkdir -p .cargo
 cat > .cargo/config.toml << EOF
 [target.aarch64-linux-android]
-ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar"
-linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android30-clang"
+ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/aarch64-linux-android30-clang"
 
 [target.armv7-linux-androideabi]
-ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar"
-linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi30-clang"
+ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/armv7a-linux-androideabi30-clang"
 
 [target.i686-linux-android]
-ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar"
-linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android30-clang"
+ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/i686-linux-android30-clang"
 
 [target.x86_64-linux-android]
-ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar"
-linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android30-clang"
+ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/x86_64-linux-android30-clang"
 EOF
 
 # Build for Android targets
