@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Add Android targets
+      run: |
+        rustup target add aarch64-linux-android
+        rustup target add armv7-linux-androideabi
+        rustup target add i686-linux-android
+        rustup target add x86_64-linux-android
+
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r26d
+        add-to-path: true
+
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-android-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-android-
+
+    - name: Cache Gradle
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Build Android AAR
+      env:
+        ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      run: |
+        chmod +x build-android.sh
+        ./build-android.sh
+
+    - name: Upload AAR artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: airgap-android-aar
+        path: android/airgap/build/outputs/aar/airgap-release.aar
+        if-no-files-found: error
+
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Add iOS targets
+      run: |
+        rustup target add aarch64-apple-ios
+        rustup target add aarch64-apple-ios-sim
+        rustup target add x86_64-apple-ios
+
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-ios-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-ios-
+
+    - name: Build iOS XCFramework
+      run: |
+        chmod +x build-ios.sh
+        ./build-ios.sh
+
+    - name: Create XCFramework archive
+      run: |
+        zip -r Airgap.xcframework.zip Airgap.xcframework
+
+    - name: Upload XCFramework artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: airgap-ios-xcframework
+        path: Airgap.xcframework.zip
+        if-no-files-found: error
+
+  create-release:
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download Android AAR
+      uses: actions/download-artifact@v4
+      with:
+        name: airgap-android-aar
+
+    - name: Download iOS XCFramework
+      uses: actions/download-artifact@v4
+      with:
+        name: airgap-ios-xcframework
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          airgap-release.aar
+          Airgap.xcframework.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

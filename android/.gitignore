@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+.kotlin/
+build/
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+.navigation/
+captures/
+.externalNativeBuild
+.cxx/
+
+# macOS
+.DS_Store
+
+# Generated files
+bin/
+gen/
+out/
+
+# Keystore files
+*.jks
+*.keystore
+
+# Log files
+*.log
+
+# Native libraries (these are built from Rust source)
+airgap/src/main/jniLibs/
