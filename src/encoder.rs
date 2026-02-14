@@ -1,5 +1,5 @@
 // encoder.rs
-
+use crate::error::AirgapError;
 use crate::protocol::*;
 use qrcode::{QrCode, EcLevel};
 use image::{DynamicImage, Luma};
@@ -29,7 +29,7 @@ impl Encoder {
     pub fn new(
         data: &[u8],
         chunk_size: usize,
-    ) -> Result<Self, TransportError> {
+    ) -> Result<Self, AirgapError> {
         Self::with_config(data, chunk_size, QrConfig::default())
     }
 
@@ -37,14 +37,14 @@ impl Encoder {
         data: &[u8],
         chunk_size: usize,
         config: QrConfig,
-    ) -> Result<Self, TransportError> {
+    ) -> Result<Self, AirgapError> {
         // Validate chunk size
         if chunk_size == 0 {
-            return Err(TransportError::ChunkSizeTooSmall(0, MIN_CHUNK_SIZE));
+            return Err(AirgapError::ChunkSizeTooSmall(0, MIN_CHUNK_SIZE));
         }
 
         if chunk_size > MAX_CHUNK_SIZE {
-            return Err(TransportError::ChunkSizeTooLarge(
+            return Err(AirgapError::ChunkSizeTooLarge(
                 chunk_size,
                 MAX_CHUNK_SIZE,
             ));
@@ -62,7 +62,7 @@ impl Encoder {
         let total_chunks = (data.len() + chunk_size - 1) / chunk_size;
 
         if total_chunks > 65535 {
-            return Err(TransportError::TooManyChunks(total_chunks));
+            return Err(AirgapError::TooManyChunks(total_chunks));
         }
 
         let session_id = rand::random::<u32>();
@@ -98,13 +98,13 @@ impl Encoder {
     pub fn chunk_count(&self) -> usize {
         self.chunks.len()
     }
-    pub fn generate_png_bytes(&self) -> Result<Vec<Vec<u8>>, TransportError> {
+    pub fn generate_png_bytes(&self) -> Result<Vec<Vec<u8>>, AirgapError> {
         let images = generate_images_from_chunks(&self.chunks, &self.config)?;
         generate_pngs_bytes(images)
     }
-    pub fn generate_png_bytes_for_item(&self, index: usize) ->  Result<Vec<u8>, TransportError> {
+    pub fn generate_png_bytes_for_item(&self, index: usize) ->  Result<Vec<u8>, AirgapError> {
         if (index > self.chunk_count()) {
-            return Err(TransportError::ChunkOutOfBounds(index as u16))
+            return Err(AirgapError::ChunkOutOfBounds(index as u16))
         }
         let image = generate_image_from_chunk(&self.chunks[index], &self.config)?;
         generate_png_bytes(&image)
@@ -112,11 +112,11 @@ impl Encoder {
 }
 
 
-pub fn generate_image_from_chunk(chunk: &Chunk, config: &QrConfig) -> Result<DynamicImage, TransportError> {
+pub fn generate_image_from_chunk(chunk: &Chunk, config: &QrConfig) -> Result<DynamicImage, AirgapError> {
     let chunk_bytes = chunk.to_bytes();
     let encoded = base45::encode_from_buffer(chunk_bytes);
     let code = QrCode::with_error_correction_level(&encoded, config.ec_level)
-        .map_err(|e| TransportError::EncodingError(e.to_string()))?;
+        .map_err(|e| AirgapError::EncodingError(e.to_string()))?;
 
     let image = code.render::<Luma<u8>>()
         .min_dimensions(config.qr_size, config.qr_size)
@@ -124,7 +124,7 @@ pub fn generate_image_from_chunk(chunk: &Chunk, config: &QrConfig) -> Result<Dyn
     Ok(DynamicImage::ImageLuma8(image))
 }
 
-pub fn generate_images_from_chunks(chunks: &Vec<Chunk>, qr_config: &QrConfig) -> Result<Vec<DynamicImage>, TransportError> {
+pub fn generate_images_from_chunks(chunks: &Vec<Chunk>, qr_config: &QrConfig) -> Result<Vec<DynamicImage>, AirgapError> {
     let mut images = Vec::with_capacity(chunks.len());
     for chunk in chunks {
         images.push(generate_image_from_chunk(chunk, qr_config)?)
@@ -132,16 +132,16 @@ pub fn generate_images_from_chunks(chunks: &Vec<Chunk>, qr_config: &QrConfig) ->
     Ok(images)
 }
 
-pub fn generate_png_bytes(image: &DynamicImage) -> Result<Vec<u8>, TransportError> {
+pub fn generate_png_bytes(image: &DynamicImage) -> Result<Vec<u8>, AirgapError> {
     let mut bytes = Vec::new();
     image.write_to(
         &mut std::io::Cursor::new(&mut bytes),
         image::ImageFormat::Png
-    ).map_err(|e| TransportError::EncodingError(e.to_string()))?;
+    ).map_err(|e| AirgapError::EncodingError(e.to_string()))?;
     Ok(bytes)
 }
 
-pub fn generate_pngs_bytes(images: Vec<DynamicImage>) -> Result<Vec<Vec<u8>>, TransportError> {
+pub fn generate_pngs_bytes(images: Vec<DynamicImage>) -> Result<Vec<Vec<u8>>, AirgapError> {
     let mut png_bytes = Vec::with_capacity(images.len());
 
     for img in &images {

@@ -1,35 +1,20 @@
 // src/ffi - C FFI interface for iOS and Android
 
 use std::os::raw::c_int;
-use std::slice;
 use std::ptr;
+use std::slice;
 
 // Only import when not generating bindings
 #[cfg(not(cbindgen))]
-use crate::{Decoder, Encoder, TransportError};
-
-// ============================================================================
-// ERROR CODES
-// ============================================================================
-
-pub const AIRGAP_OK: c_int = 0;
-pub const AIRGAP_UNKNOWN_ERR: c_int = -1;
-pub const AIRGAP_ERR_NULL_POINTER: c_int = -2;
-pub const AIRGAP_ERR_INVALID_MAGIC: c_int = -3;
-pub const AIRGAP_ERR_UNSUPPORTED_VERSION: c_int = -4;
-pub const AIRGAP_ERR_CRC_MISMATCH: c_int = -5;
-pub const AIRGAP_ERR_SESSION_MISMATCH: c_int = -6;
-pub const AIRGAP_ERR_METADATA_MISMATCH: c_int = -7;
-pub const AIRGAP_ERR_CHUNK_OUT_OF_BOUNDS: c_int = -8;
-pub const AIRGAP_ERR_TOO_MANY_CHUNKS: c_int = -9;
-pub const AIRGAP_ERR_CHUNK_SIZE_TOO_LARGE: c_int = -10;
-pub const AIRGAP_ERR_CHUNK_SIZE_TOO_SMALL: c_int = -11;
-pub const AIRGAP_ERR_MISSING_CHUNK: c_int = -12;
-pub const AIRGAP_ERR_ENCODING: c_int = -13;
+use crate::{Decoder, Encoder};
+use crate::ffi_result::{CResult, AIRGAP_OK};
 
 pub enum AirgapEncoder {}
 
 pub enum AirgapDecoder {}
+
+
+const C_NULL_PTR_ERR: CResult = CResult::from_custom_error("encoder null ptr".to_string(), -1);
 
 #[repr(C)]
 pub struct ByteArray {
@@ -84,25 +69,18 @@ pub unsafe extern "C" fn airgap_encoder_session_id(encoder: *const AirgapEncoder
 pub unsafe extern "C" fn airgap_encoder_generate_png(
     encoder: *const AirgapEncoder,
     index: usize,
-    result: *mut ByteArray,
-) -> isize {
+) -> CResult {
     if encoder.is_null() {
-        return AIRGAP_ERR_NULL_POINTER as isize;
-    }
-
-    if result.is_null() {
-        return AIRGAP_ERR_NULL_POINTER as isize;
+        return CResult::from_custom_error("encoder null ptr".to_string(), -1);
     }
 
     let png = match (*(encoder as *const Encoder)).generate_png_bytes_for_item(index) {
         Ok(p) => p,
         Err(e) => {
-            return error_to_code(e) as isize;
+            return CResult::from_error(e);
         }
     };
-
-    *result = ByteArray::from_vec(png);
-    AIRGAP_OK as isize
+    CResult::from_success(Box::new(ByteArray::from_vec(png)))
 }
 
 #[unsafe(no_mangle)]
@@ -130,7 +108,7 @@ pub unsafe extern "C" fn airgap_decoder_get_total(decoder: *const AirgapDecoder)
     if decoder.is_null() {
         return 0;
     }
-    (*(decoder as *const Decoder)).progress().1
+    (*(decoder as *const Decoder)).total_count()
 }
 
 
@@ -139,7 +117,33 @@ pub unsafe extern "C" fn airgap_decoder_get_received(decoder: *const AirgapDecod
     if decoder.is_null() {
         return 0;
     }
-    (*(decoder as *const Decoder)).progress().0
+    (*(decoder as *const Decoder)).received_count()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn airgap_decoder_get_session_id(decoder: *const AirgapDecoder) -> isize {
+    if decoder.is_null() {
+        return 0;
+    }
+    match (*(decoder as *const Decoder)).session_id() {
+        Some(session_id) => session_id as isize,
+        None => -1
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn airgap_decoder_reset(decoder: *const AirgapDecoder) -> c_int{
+    if decoder.is_null() {
+        return -1;
+    }
+    (*(decoder as *mut Decoder)).reset();
+    AIRGAP_OK
+}
+
+#[repr(C)]
+pub struct QRResult {
+    pub chunk_number: usize,
+    pub total_chunk_count: usize,
 }
 
 
@@ -147,46 +151,40 @@ pub unsafe extern "C" fn airgap_decoder_get_received(decoder: *const AirgapDecod
 pub unsafe extern "C" fn airgap_decoder_process_qr(
     decoder: *mut AirgapDecoder,
     qr_string: *const std::os::raw::c_char,
-) -> isize {
+) -> CResult {
     if decoder.is_null() {
-        return AIRGAP_ERR_NULL_POINTER as isize;
+        return C_NULL_PTR_ERR;
     }
 
     if qr_string.is_null() {
-        return AIRGAP_ERR_NULL_POINTER as isize;
+        return C_NULL_PTR_ERR;
     }
 
     let c_str = std::ffi::CStr::from_ptr(qr_string);
     let qr_data = match c_str.to_str() {
         Ok(s) => s,
-        Err(_) => return AIRGAP_ERR_ENCODING as isize,
+        Err(_) => return CResult::from_custom_error("c str conv".to_string(), -2),
     };
 
     match (*(decoder as *mut Decoder)).process_qr_string(qr_data) {
-        Ok(_) => AIRGAP_OK as isize,
-        Err(err) => error_to_code(err) as isize,
+        Ok(chunk) => CResult::from_success(Box::new(QRResult{ chunk_number: chunk.chunk_index as usize, total_chunk_count: chunk.total_chunks as usize })),
+        Err(err) => CResult::from_error(err),
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_decoder_get_data(
     decoder: *const AirgapDecoder,
-    result: *mut ByteArray,
-) -> isize {
+) -> CResult {
     if decoder.is_null() {
-        return AIRGAP_ERR_NULL_POINTER as isize;
-    }
-
-    if result.is_null() {
-        return AIRGAP_ERR_NULL_POINTER as isize;
+        return C_NULL_PTR_ERR;
     }
 
     match (*(decoder as *const Decoder)).get_data() {
         Ok(vec) => {
-            *result = ByteArray::from_vec(vec);
-            AIRGAP_OK as isize
+            CResult::from_success(Box::new(ByteArray::from_vec(vec)))
         }
-        Err(err) => error_to_code(err) as isize,
+        Err(err) => CResult::from_error(err),
     }
 }
 
@@ -215,23 +213,5 @@ impl ByteArray {
 
     pub fn is_null(&self) -> bool {
         self.data.is_null()
-    }
-}
-
-#[cfg(not(cbindgen))]
-fn error_to_code(err: TransportError) -> c_int {
-    match err {
-        TransportError::UnknownError => AIRGAP_UNKNOWN_ERR,
-        TransportError::InvalidMagic => AIRGAP_ERR_INVALID_MAGIC,
-        TransportError::UnsupportedVersion(_) => AIRGAP_ERR_UNSUPPORTED_VERSION,
-        TransportError::CrcMismatch => AIRGAP_ERR_CRC_MISMATCH,
-        TransportError::MetadataMismatch => AIRGAP_ERR_METADATA_MISMATCH,
-        TransportError::SessionMismatch => AIRGAP_ERR_SESSION_MISMATCH,
-        TransportError::ChunkOutOfBounds(_) => AIRGAP_ERR_CHUNK_OUT_OF_BOUNDS,
-        TransportError::TooManyChunks(_) => AIRGAP_ERR_TOO_MANY_CHUNKS,
-        TransportError::ChunkSizeTooLarge(_, _) => AIRGAP_ERR_CHUNK_SIZE_TOO_LARGE,
-        TransportError::ChunkSizeTooSmall(_, _) => AIRGAP_ERR_CHUNK_SIZE_TOO_SMALL,
-        TransportError::MissingChunk(_) => AIRGAP_ERR_MISSING_CHUNK,
-        TransportError::EncodingError(_) => AIRGAP_ERR_ENCODING,
     }
 }

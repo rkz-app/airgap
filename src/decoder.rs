@@ -1,5 +1,6 @@
 use crate::protocol::*;
 use std::collections::HashMap;
+use crate::error::AirgapError;
 
 pub struct Decoder {
     received_chunks: HashMap<u16, Vec<u8>>,
@@ -17,10 +18,10 @@ impl Decoder {
     }
 
     /// Process a scanned QR code string
-    pub fn process_qr_string(&mut self, qr_data: &str) -> Result<Chunk, TransportError> {
+    pub fn process_qr_string(&mut self, qr_data: &str) -> Result<Chunk, AirgapError> {
         // Decode Base45
         let chunk_bytes = base45::decode(qr_data).map_err(|e| {
-            return TransportError::EncodingError(e.to_string())
+            return AirgapError::EncodingError(e.to_string())
         })?;
 
         // Parse chunk
@@ -33,11 +34,11 @@ impl Decoder {
         }
 
         if self.total_chunks.unwrap() != chunk.total_chunks {
-            return Err(TransportError::MetadataMismatch)
+            return Err(AirgapError::MetadataMismatch)
         }
         
         if Some(chunk.session_id) != self.session_id {
-            return Err(TransportError::SessionMismatch);
+            return Err(AirgapError::SessionMismatch);
         }
 
         // Store chunk data
@@ -53,18 +54,23 @@ impl Decoder {
         }
     }
 
-    pub fn progress(&self) -> (usize, usize) {
-        let received = self.received_chunks.len();
-        let total = self.total_chunks.unwrap_or(0) as usize;
-        (received, total)
+    pub fn session_id(&self) -> Option<u32> {
+        self.session_id
+    }
+
+    pub fn received_count(&self) -> usize {
+        self.received_chunks.len()
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.total_chunks.unwrap_or(0) as usize
     }
 
     /// Get reassembled data
-    pub fn get_data(&self) -> Result<Vec<u8>, TransportError> {
+    pub fn get_data(&self) -> Result<Vec<u8>, AirgapError> {
         if !self.is_complete() {
-            let (received, total) = self.progress();
-            return Err(TransportError::EncodingError(
-                format!("Incomplete: {}/{} chunks", received, total)
+            return Err(AirgapError::EncodingError(
+                format!("Incomplete: {}/{} chunks", self.received_count(), self.total_count())
             ));
         }
 
@@ -74,7 +80,7 @@ impl Decoder {
         let mut result = Vec::new();
         for i in 0..total_chunks {
             let chunk_data = self.received_chunks.get(&i)
-                .ok_or(TransportError::MissingChunk(i))?;
+                .ok_or(AirgapError::MissingChunk(i))?;
             result.extend_from_slice(chunk_data);
         }
 

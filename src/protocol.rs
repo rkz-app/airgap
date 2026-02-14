@@ -1,37 +1,11 @@
+use crate::error::AirgapError;
+
 pub const MAGIC: [u8; 2] = [0x19, 0xF7];
 pub const VERSION: u8 = 1;
 pub const HEADER_SIZE: usize = 16;
 pub const MAX_CHUNK_SIZE: usize = 1920;
 pub const RECOMMENDED_MAX_CHUNK_SIZE: usize = 1100;
 pub const MIN_CHUNK_SIZE: usize = 16;
-
-#[derive(Debug, thiserror::Error)]
-pub enum TransportError {
-    #[error("Unknown error")]
-    UnknownError,
-    #[error("Invalid magic bytes")]
-    InvalidMagic,
-    #[error("Unsupported version: {0}")]
-    UnsupportedVersion(u8),
-    #[error("CRC mismatch")]
-    CrcMismatch,
-    #[error("Session ID mismatch")]
-    SessionMismatch,
-    #[error("Metadata mismatch")]
-    MetadataMismatch,
-    #[error("Chunk index {0} out of bounds")]
-    ChunkOutOfBounds(u16),
-    #[error("Too many chunks: {0} (max 65535)")]
-    TooManyChunks(usize),
-    #[error("Chunk size {0} exceeds maximum {1}")]
-    ChunkSizeTooLarge(usize, usize),
-    #[error("Chunk size {0} below minimum {1}")]
-    ChunkSizeTooSmall(usize, usize),
-    #[error("Missing chunk {0}")]
-    MissingChunk(u16),
-    #[error("Encoding error: {0}")]
-    EncodingError(String),
-}
 
 #[derive(Debug, Clone)]
 pub struct Chunk {
@@ -47,17 +21,17 @@ impl Chunk {
         chunk_index: u16,
         session_id: u32,
         data: Vec<u8>,
-    ) -> Result<Self, TransportError> {
+    ) -> Result<Self, AirgapError> {
         // Validate chunk data size
         if data.len() > MAX_CHUNK_SIZE {
-            return Err(TransportError::ChunkSizeTooLarge(
+            return Err(AirgapError::ChunkSizeTooLarge(
                 data.len(),
                 MAX_CHUNK_SIZE,
             ));
         }
 
         if data.is_empty() {
-            return Err(TransportError::ChunkSizeTooSmall(0, 1));
+            return Err(AirgapError::ChunkSizeTooSmall(0, 1));
         }
 
         Ok(Self {
@@ -93,21 +67,21 @@ impl Chunk {
         bytes
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, TransportError> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, AirgapError> {
 
         if bytes.len() < HEADER_SIZE + 4 {
-            return Err(TransportError::EncodingError(
+            return Err(AirgapError::EncodingError(
                 "Chunk too small".into()
             ));
         }
 
         if &bytes[0..2] != &MAGIC {
-            return Err(TransportError::InvalidMagic);
+            return Err(AirgapError::InvalidMagic);
         }
 
         let version = bytes[2];
         if version != VERSION {
-            return Err(TransportError::UnsupportedVersion(version));
+            return Err(AirgapError::UnsupportedVersion(version));
         }
 
         let total_chunks = u16::from_be_bytes([bytes[3], bytes[4]]);
@@ -118,12 +92,12 @@ impl Chunk {
         let data_len = u16::from_be_bytes([bytes[11], bytes[12]]) as usize;
 
         if chunk_index >= total_chunks {
-            return Err(TransportError::ChunkOutOfBounds(chunk_index));
+            return Err(AirgapError::ChunkOutOfBounds(chunk_index));
         }
 
         // Validate data length
         if data_len > MAX_CHUNK_SIZE {
-            return Err(TransportError::ChunkSizeTooLarge(
+            return Err(AirgapError::ChunkSizeTooLarge(
                 data_len,
                 MAX_CHUNK_SIZE,
             ));
@@ -133,7 +107,7 @@ impl Chunk {
         let data_end = data_start + data_len;
 
         if bytes.len() < data_end + 4 {
-            return Err(TransportError::EncodingError(
+            return Err(AirgapError::EncodingError(
                 "Chunk truncated".into()
             ));
         }
@@ -150,7 +124,7 @@ impl Chunk {
         let calculated_crc = crc32fast::hash(&bytes[..data_end]);
 
         if stored_crc != calculated_crc {
-            return Err(TransportError::CrcMismatch);
+            return Err(AirgapError::CrcMismatch);
         }
 
         Ok(Self {
