@@ -6,6 +6,7 @@
 //
 
 #import <Foundation/Foundation.h>
+#import "AGQRResult.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -39,9 +40,9 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @param qrString The string data from a scanned QR code
  * @param error Error pointer for processing failures
- * @return YES if processing succeeded, NO otherwise
+ * @return AGQRResult with chunk information if successful, nil otherwise
  */
-- (BOOL)processQRString:(NSString *)qrString error:(NSError **)error;
+- (nullable AGQRResult *)processQRString:(NSString *)qrString error:(NSError **)error;
 
 /**
  * Get the decoded data once complete

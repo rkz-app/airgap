@@ -39,10 +39,22 @@ compile_and_merge_objc() {
     local temp_dir="target/temp_objc_${arch}"
     mkdir -p "${temp_dir}"
 
+    # Compile AGQRResult.m
+    xcrun -sdk ${sdk} clang -c \
+        -arch ${arch} \
+        -I./include \
+        -I./objc \
+        -fobjc-arc \
+        -fmodules \
+        -fPIC \
+        -o "${temp_dir}/AGQRResult.o" \
+        objc/AGQRResult.m
+
     # Compile AGEncoder.m
     xcrun -sdk ${sdk} clang -c \
         -arch ${arch} \
         -I./include \
+        -I./objc \
         -fobjc-arc \
         -fmodules \
         -fPIC \
@@ -53,6 +65,7 @@ compile_and_merge_objc() {
     xcrun -sdk ${sdk} clang -c \
         -arch ${arch} \
         -I./include \
+        -I./objc \
         -fobjc-arc \
         -fmodules \
         -fPIC \
@@ -67,6 +80,7 @@ compile_and_merge_objc() {
         -fobjc-link-runtime \
         -framework Foundation \
         -Wl,-force_load,"${rust_dylib}" \
+        "${temp_dir}/AGQRResult.o" \
         "${temp_dir}/AGEncoder.o" \
         "${temp_dir}/AGDecoder.o" \
         -o "${output_dylib}"
@@ -94,6 +108,7 @@ create_framework() {
     cp -r include/* "${framework_dir}/Headers/"
 
     # Copy ObjC headers
+    cp objc/AGQRResult.h "${framework_dir}/Headers/"
     cp objc/AGEncoder.h "${framework_dir}/Headers/"
     cp objc/AGDecoder.h "${framework_dir}/Headers/"
 
@@ -106,6 +121,7 @@ create_framework() {
 
 #import <Foundation/Foundation.h>
 
+#import "AGQRResult.h"
 #import "AGEncoder.h"
 #import "AGDecoder.h"
 UMBRELLA

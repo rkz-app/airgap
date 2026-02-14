@@ -7,6 +7,7 @@ use std::slice;
 // Only import when not generating bindings
 #[cfg(not(cbindgen))]
 use crate::{Decoder, Encoder};
+use crate::error::AirgapError;
 use crate::ffi_result::{CResult, AIRGAP_OK};
 
 pub enum AirgapEncoder {}
@@ -15,9 +16,7 @@ pub enum AirgapDecoder {}
 
 #[repr(C)]
 pub struct ByteArray {
-    /// Pointer to byte data (may be NULL if empty)
     pub data: *mut u8,
-    /// Length of data in bytes
     pub len: usize,
 }
 
@@ -26,16 +25,16 @@ pub unsafe extern "C" fn airgap_encoder_new(
     data: *const u8,
     data_len: usize,
     chunk_size: usize,
-) -> *mut AirgapEncoder {
+) -> CResult {
     if data.is_null() {
-        return ptr::null_mut();
+        return CResult::from_error(AirgapError::UnknownError)
     }
 
     let data_slice = unsafe { slice::from_raw_parts(data, data_len) };
 
     match Encoder::new(data_slice, chunk_size) {
-        Ok(encoder) => Box::into_raw(Box::new(encoder)) as *mut AirgapEncoder,
-        Err(_) => ptr::null_mut(),
+        Ok(encoder) => CResult::from_success(Box::new(encoder)),
+        Err(err) => CResult::from_error(err),
     }
 }
 
