@@ -143,7 +143,6 @@ pub struct QRResult {
     pub total_chunk_count: usize,
 }
 
-
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_decoder_process_qr(
     decoder: *mut AirgapDecoder,

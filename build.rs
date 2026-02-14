@@ -16,12 +16,8 @@ fn main() {
     std::fs::create_dir_all(output_file.parent().unwrap()).unwrap();
 
     cbindgen::Builder::new()
-        .with_crate(crate_dir)
-        .with_language(cbindgen::Language::C)
-        .with_cpp_compat(true)
-        .with_include_guard("AIRGAP_H")
-        .with_documentation(true)
-        .with_pragma_once(true)
+        .with_crate(&crate_dir)
+        .with_config(cbindgen::Config::from_file("cbindgen.toml").unwrap())
         .generate()
         .expect("Unable to generate bindings")
         .write_to_file(&output_file);
