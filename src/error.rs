@@ -1,3 +1,5 @@
+
+#[cfg(not(cbindgen))]
 #[derive(Debug, thiserror::Error)]
 pub enum AirgapError {
     #[error("Unknown error")]
@@ -39,8 +41,9 @@ pub const AIRGAP_ERR_CHUNK_SIZE_TOO_SMALL: i32 = -19;
 pub const AIRGAP_ERR_MISSING_CHUNK: i32 = -20;
 pub const AIRGAP_ERR_ENCODING: i32 = -21;
 
+#[cfg(not(cbindgen))]
 impl AirgapError {
-    pub(crate) fn to_code(&self: AirgapError) -> i32 {
+    pub(crate) fn to_code(&self) -> i32 {
         match self {
             AirgapError::UnknownError => AIRGAP_UNKNOWN_ERR,
             AirgapError::InvalidMagic => AIRGAP_ERR_INVALID_MAGIC,

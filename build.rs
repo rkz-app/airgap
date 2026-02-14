@@ -4,6 +4,9 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    // Tell cbindgen to recognize the 'cbindgen' cfg attribute
+    println!("cargo::rustc-check-cfg=cfg(cbindgen)");
+
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let output_file = PathBuf::from(&crate_dir)
         .join("include")

@@ -13,9 +13,6 @@ pub enum AirgapEncoder {}
 
 pub enum AirgapDecoder {}
 
-
-const C_NULL_PTR_ERR: CResult = CResult::from_custom_error("encoder null ptr".to_string(), -1);
-
 #[repr(C)]
 pub struct ByteArray {
     /// Pointer to byte data (may be NULL if empty)
@@ -153,11 +150,11 @@ pub unsafe extern "C" fn airgap_decoder_process_qr(
     qr_string: *const std::os::raw::c_char,
 ) -> CResult {
     if decoder.is_null() {
-        return C_NULL_PTR_ERR;
+        return CResult::from_custom_error("decoder null ptr".to_string(), -1);
     }
 
     if qr_string.is_null() {
-        return C_NULL_PTR_ERR;
+        return CResult::from_custom_error("qr_string null ptr".to_string(), -1);
     }
 
     let c_str = std::ffi::CStr::from_ptr(qr_string);
@@ -177,7 +174,7 @@ pub unsafe extern "C" fn airgap_decoder_get_data(
     decoder: *const AirgapDecoder,
 ) -> CResult {
     if decoder.is_null() {
-        return C_NULL_PTR_ERR;
+        return CResult::from_custom_error("decoder null ptr".to_string(), -1);
     }
 
     match (*(decoder as *const Decoder)).get_data() {
