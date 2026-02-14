@@ -16,21 +16,8 @@ class AirgapEncoder @Throws(AirgapException::class) constructor(
 
     init {
         System.loadLibrary("airgap")
-
-        if (data.isEmpty()) {
-            throw AirgapException("Data cannot be empty")
-        }
-
-        if (chunkSize < MIN_CHUNK_SIZE || chunkSize > MAX_CHUNK_SIZE) {
-            throw AirgapException(
-                "Chunk size must be between $MIN_CHUNK_SIZE and $MAX_CHUNK_SIZE, got $chunkSize"
-            )
-        }
-
+        // All validation is done in Rust - JNI will throw AirgapException on error
         nativeHandle = nativeNew(data, chunkSize)
-        if (nativeHandle == 0L) {
-            throw AirgapException("Failed to create encoder")
-        }
     }
 
     /**
@@ -52,6 +39,22 @@ class AirgapEncoder @Throws(AirgapException::class) constructor(
         }
 
     /**
+     * Gets the QR code string for the chunk at the given index (base45-encoded)
+     * This is what would be scanned from a QR code
+     *
+     * @param index The chunk index (0-based)
+     * @return QR code string (base45-encoded)
+     * @throws AirgapException if retrieval fails or index is out of bounds
+     */
+    @Throws(AirgapException::class)
+    fun getQRString(index: Int): String {
+        checkNotClosed()
+        // All validation is done in Rust - JNI will throw AirgapException on error
+        return nativeGetQRString(nativeHandle, index)
+            ?: throw AirgapException("Failed to get QR string at index $index")
+    }
+
+    /**
      * Generates a PNG image for the chunk at the given index
      *
      * @param index The chunk index (0-based)
@@ -61,15 +64,9 @@ class AirgapEncoder @Throws(AirgapException::class) constructor(
     @Throws(AirgapException::class)
     fun generatePng(index: Int): ByteArray {
         checkNotClosed()
-
-        if (index < 0 || index >= chunkCount) {
-            throw AirgapException("Index $index out of bounds [0, $chunkCount)")
-        }
-
-        val result = nativeGeneratePng(nativeHandle, index)
+        // All validation is done in Rust - JNI will throw AirgapException on error
+        return nativeGeneratePng(nativeHandle, index)
             ?: throw AirgapException("Failed to generate PNG at index $index")
-
-        return result
     }
 
     /**
@@ -102,6 +99,7 @@ class AirgapEncoder @Throws(AirgapException::class) constructor(
     private external fun nativeFree(handle: Long)
     private external fun nativeChunkCount(handle: Long): Int
     private external fun nativeSessionId(handle: Long): Int
+    private external fun nativeGetQRString(handle: Long, index: Int): String?
     private external fun nativeGeneratePng(handle: Long, index: Int): ByteArray?
 
     companion object {

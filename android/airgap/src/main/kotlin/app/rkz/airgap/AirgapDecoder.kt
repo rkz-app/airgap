@@ -43,6 +43,15 @@ class AirgapDecoder : AutoCloseable {
         }
 
     /**
+     * The session ID of the current decoding session (-1 if no session started)
+     */
+    val sessionId: Int
+        get() {
+            checkNotClosed()
+            return nativeGetSessionId(nativeHandle)
+        }
+
+    /**
      * Get the decoding progress as a pair of (received, total)
      */
     val progress: Pair<Int, Int>
@@ -52,16 +61,23 @@ class AirgapDecoder : AutoCloseable {
      * Process a QR code string
      *
      * @param qrString The string data from a scanned QR code
+     * @return QRResult with chunk information
      * @throws AirgapException if processing fails
      */
     @Throws(AirgapException::class)
-    fun processQrString(qrString: String) {
+    fun processQrString(qrString: String): QRResult {
         checkNotClosed()
+        // JNI will throw AirgapException on error
+        return nativeProcessQr(nativeHandle, qrString)
+            ?: throw AirgapException("Failed to process QR code")
+    }
 
-        val result = nativeProcessQr(nativeHandle, qrString)
-        if (result != 0) {
-            throw AirgapException("Failed to process QR code: error code $result")
-        }
+    /**
+     * Reset the decoder to its initial state
+     */
+    fun reset() {
+        checkNotClosed()
+        nativeReset(nativeHandle)
     }
 
     /**
@@ -73,13 +89,7 @@ class AirgapDecoder : AutoCloseable {
     @Throws(AirgapException::class)
     fun getData(): ByteArray {
         checkNotClosed()
-
-        if (!isComplete) {
-            throw AirgapException(
-                "Decoding is not complete yet (received $receivedChunks/$totalChunks chunks)"
-            )
-        }
-
+        // JNI will throw AirgapException on error (including if not complete)
         return nativeGetData(nativeHandle)
             ?: throw AirgapException("Failed to retrieve decoded data")
     }
@@ -103,6 +113,8 @@ class AirgapDecoder : AutoCloseable {
     private external fun nativeIsComplete(handle: Long): Boolean
     private external fun nativeGetTotal(handle: Long): Int
     private external fun nativeGetReceived(handle: Long): Int
-    private external fun nativeProcessQr(handle: Long, qrString: String): Int
+    private external fun nativeGetSessionId(handle: Long): Int
+    private external fun nativeProcessQr(handle: Long, qrString: String): QRResult?
     private external fun nativeGetData(handle: Long): ByteArray?
+    private external fun nativeReset(handle: Long)
 }

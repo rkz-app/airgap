@@ -31,8 +31,7 @@ mod tests {
 
         // Get raw encoded strings (simulate QR scanning)
         for i in 0..encoder.chunk_count() {
-            let chunk_bytes = encoder.get_chunk_bytes(i);
-            let qr_string = base45::encode_from_buffer(chunk_bytes);
+            let qr_string = encoder.get_qr_string(i).unwrap();
             decoder.process_qr_string(&qr_string).unwrap();
         }
 

@@ -37,6 +37,16 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) uint32_t sessionId;
 
 /**
+ * Gets the QR code string for the chunk at the given index (base45-encoded)
+ * This is what would be scanned from a QR code
+ *
+ * @param index The chunk index (0-based)
+ * @param error Error pointer for retrieval failures
+ * @return QR code string (base45-encoded), or nil if retrieval fails
+ */
+- (nullable NSString *)getQRStringAtIndex:(NSUInteger)index error:(NSError **)error;
+
+/**
  * Generates a PNG image for the chunk at the given index
  *
  * @param index The chunk index (0-based)

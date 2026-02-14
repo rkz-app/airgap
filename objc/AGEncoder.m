@@ -55,6 +55,51 @@ static NSString *const AGEncoderErrorDomain = @"app.rkz.airgap.encoder";
     return airgap_encoder_session_id(_encoder);
 }
 
+- (nullable NSString *)getQRStringAtIndex:(NSUInteger)index error:(NSError **)error {
+    if (!_encoder) {
+        if (error) {
+            *error = [NSError errorWithDomain:AGEncoderErrorDomain
+                                        code:-1
+                                    userInfo:@{NSLocalizedDescriptionKey: @"Encoder is not initialized"}];
+        }
+        return nil;
+    }
+
+    struct CResult result = airgap_encoder_get_qr_string(_encoder, index);
+
+    if (result.code != AIRGAP_OK) {
+        if (error) {
+            NSString *message = [NSString stringWithUTF8String:result.error_message];
+            *error = [NSError errorWithDomain:AGEncoderErrorDomain
+                                        code:result.code
+                                    userInfo:@{NSLocalizedDescriptionKey: message}];
+        }
+        result_error_message_free(result);
+        return nil;
+    }
+
+    if (!result.payload) {
+        if (error) {
+            *error = [NSError errorWithDomain:AGEncoderErrorDomain
+                                        code:-1
+                                    userInfo:@{NSLocalizedDescriptionKey: @"Generated empty QR string"}];
+        }
+        result_error_message_free(result);
+        return nil;
+    }
+
+    // Extract ByteArray (which contains null-terminated C string) and convert to NSString
+    struct ByteArray *byteArray = (struct ByteArray *)result.payload;
+    NSString *qrString = [NSString stringWithUTF8String:(const char *)byteArray->data];
+
+    // Free resources
+    airgap_byte_array_free(*byteArray);
+    free((void *)result.payload);
+    result_error_message_free(result);
+
+    return qrString;
+}
+
 - (nullable NSData *)generatePNGAtIndex:(NSUInteger)index error:(NSError **)error {
     if (!_encoder) {
         if (error) {

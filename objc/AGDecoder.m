@@ -44,6 +44,17 @@ static NSString *const AGDecoderErrorDomain = @"app.rkz.airgap.decoder";
     return airgap_decoder_get_received(_decoder);
 }
 
+- (NSInteger)sessionId {
+    if (!_decoder) return -1;
+    return airgap_decoder_get_session_id(_decoder);
+}
+
+- (void)reset {
+    if (_decoder) {
+        airgap_decoder_reset(_decoder);
+    }
+}
+
 - (nullable AGQRResult *)processQRString:(NSString *)qrString error:(NSError **)error {
     if (!_decoder) {
         if (error) {

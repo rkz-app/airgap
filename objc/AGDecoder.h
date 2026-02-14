@@ -36,6 +36,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) NSUInteger receivedChunks;
 
 /**
+ * The session ID of the current decoding session (-1 if no session started)
+ */
+@property (nonatomic, readonly) NSInteger sessionId;
+
+/**
  * Process a QR code string
  *
  * @param qrString The string data from a scanned QR code
@@ -43,6 +48,11 @@ NS_ASSUME_NONNULL_BEGIN
  * @return AGQRResult with chunk information if successful, nil otherwise
  */
 - (nullable AGQRResult *)processQRString:(NSString *)qrString error:(NSError **)error;
+
+/**
+ * Reset the decoder to its initial state
+ */
+- (void)reset;
 
 /**
  * Get the decoded data once complete

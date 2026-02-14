@@ -89,9 +89,14 @@ impl Encoder {
             config,
         })
     }
-    pub fn get_chunk_bytes(&self, index: usize) -> Vec<u8>{
-        self.chunks[index].to_bytes()
+    pub fn get_qr_string(&self, index: usize) -> Result<String, AirgapError> {
+        if (index > self.chunks.len() - 1) {
+            return Err(AirgapError::ChunkOutOfBounds(index as u16))
+        }
+        let chunk_bytes = self.chunks[index].to_bytes();
+        Ok(base45::encode(&chunk_bytes))
     }
+
     pub fn session_id(&self) -> u32 {
         self.session_id
     }

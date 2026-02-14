@@ -62,6 +62,32 @@ pub unsafe extern "C" fn airgap_encoder_session_id(encoder: *const AirgapEncoder
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn airgap_encoder_get_qr_string(
+    encoder: *const AirgapEncoder,
+    index: usize,
+) -> CResult {
+    if encoder.is_null() {
+        return CResult::from_custom_error("encoder null ptr".to_string(), -1);
+    }
+
+    let qr_string = match (*(encoder as *const Encoder)).get_qr_string(index) {
+        Ok(s) => s,
+        Err(e) => {
+            return CResult::from_error(e);
+        }
+    };
+
+    let c_string = match std::ffi::CString::new(qr_string) {
+        Ok(s) => s,
+        Err(_) => {
+            return CResult::from_custom_error("Failed to create C string".to_string(), -1);
+        }
+    };
+
+    CResult::from_success(Box::new(ByteArray::from_vec(c_string.into_bytes_with_nul())))
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_encoder_generate_png(
     encoder: *const AirgapEncoder,
     index: usize,
