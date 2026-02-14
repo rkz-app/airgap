@@ -1,12 +1,9 @@
 #!/bin/bash
 set -e
 
-echo "🧪 Running Airgap Kotlin Tests"
-echo "================================"
-
-# Build the library for macOS (for JVM testing)
-echo "Building native library for macOS..."
-cd ..
+echo "🧪 Airgap Kotlin/JVM Test Runner"
+echo "=================================="
+echo ""
 
 # Determine target based on macOS architecture
 ARCH=$(uname -m)
@@ -19,14 +16,23 @@ else
     exit 1
 fi
 
-# Build for macOS
-cargo build --release --target $TARGET > /dev/null 2>&1
+# Build the library for macOS (JNI now works on all JVM targets!)
+echo "Building native library for macOS ($TARGET)..."
+cd ..
+cargo build --release --target $TARGET
 cd android
+
+# Create jniLibs directory for tests
+JNILIBS_DIR="airgap/src/test/jniLibs"
+mkdir -p "$JNILIBS_DIR"
+
+# Copy the dylib to jniLibs (JVM will look for libairgap.dylib)
+echo "Copying native library to test jniLibs..."
+cp "../target/$TARGET/release/libairgap.dylib" "$JNILIBS_DIR/"
 
 # Compile classes using gradle
 echo "Compiling Kotlin classes with gradle..."
-./gradlew :airgap:compileDebugKotlin > /dev/null 2>&1
-./gradlew :airgap:compileDebugUnitTestKotlin > /dev/null 2>&1
+./gradlew :airgap:compileDebugKotlin :airgap:compileDebugUnitTestKotlin --quiet
 
 # Find all Kotlin jars in gradle cache
 KOTLIN_JARS=$(find ~/.gradle/caches -name "kotlin-stdlib*.jar" -o -name "kotlin-test*.jar" | tr '\n' ':')
@@ -39,18 +45,16 @@ fi
 MAIN_CLASSES="airgap/build/tmp/kotlin-classes/debug"
 TEST_CLASSES="airgap/build/tmp/kotlin-classes/debugUnitTest"
 
-# Use the macOS target directory
-NATIVE_LIB_PATH="../target/$TARGET/release"
-
-# Run the tests
-echo "Running tests..."
+# Run the tests using the main() function in AirgapTests.kt
+echo "Running Kotlin/JVM tests..."
 echo ""
 
 java \
-    -Djava.library.path="$NATIVE_LIB_PATH" \
+    -Djava.library.path="$JNILIBS_DIR" \
     -classpath "$MAIN_CLASSES:$TEST_CLASSES:$KOTLIN_JARS" \
     app.rkz.airgap.AirgapTestsKt
 
 echo ""
 echo "================================"
-echo "✅ All Kotlin tests completed!"
+echo "✅ All Kotlin/JVM tests passed!"
+echo ""

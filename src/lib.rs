@@ -2,9 +2,7 @@ pub mod protocol;
 pub mod encoder;
 pub mod decoder;
 pub mod ffi;
-
-#[cfg(target_os = "android")]
-pub mod ffi_android;
+pub mod ffi_android;  // JNI bindings for all JVM targets (Android, desktop Java/Kotlin)
 mod error;
 mod c_result;
 

@@ -38,9 +38,14 @@ impl Encoder {
         chunk_size: usize,
         config: QrConfig,
     ) -> Result<Self, AirgapError> {
+
+        if data.len() == 0 {
+            return Err(AirgapError::EmptyData);
+        }
+
         // Validate chunk size
-        if chunk_size == 0 {
-            return Err(AirgapError::ChunkSizeTooSmall(0, MIN_CHUNK_SIZE));
+        if chunk_size < MIN_CHUNK_SIZE {
+            return Err(AirgapError::ChunkSizeTooSmall(chunk_size, MIN_CHUNK_SIZE));
         }
 
         if chunk_size > MAX_CHUNK_SIZE {

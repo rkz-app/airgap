@@ -26,6 +26,8 @@ pub enum AirgapError {
     MissingChunk(u16),
     #[error("Encoding error: {0}")]
     EncodingError(String),
+    #[error("Empty data for encoder")]
+    EmptyData,
 }
 
 pub const AIRGAP_UNKNOWN_ERR: i32 = -10;
@@ -40,6 +42,7 @@ pub const AIRGAP_ERR_CHUNK_SIZE_TOO_LARGE: i32 = -18;
 pub const AIRGAP_ERR_CHUNK_SIZE_TOO_SMALL: i32 = -19;
 pub const AIRGAP_ERR_MISSING_CHUNK: i32 = -20;
 pub const AIRGAP_ERR_ENCODING: i32 = -21;
+pub const AIRGAP_ERR_EMPTY_DATA: i32 = -22;
 
 #[cfg(not(cbindgen))]
 impl AirgapError {
@@ -57,6 +60,7 @@ impl AirgapError {
             AirgapError::ChunkSizeTooSmall(_, _) => AIRGAP_ERR_CHUNK_SIZE_TOO_SMALL,
             AirgapError::MissingChunk(_) => AIRGAP_ERR_MISSING_CHUNK,
             AirgapError::EncodingError(_) => AIRGAP_ERR_ENCODING,
+            AirgapError::EmptyData => AIRGAP_ERR_EMPTY_DATA,
         }
     }
 

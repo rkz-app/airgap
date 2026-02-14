@@ -16,7 +16,6 @@ class AirgapEncoder @Throws(AirgapException::class) constructor(
 
     init {
         System.loadLibrary("airgap")
-        // All validation is done in Rust - JNI will throw AirgapException on error
         nativeHandle = nativeNew(data, chunkSize)
     }
 
