@@ -1,7 +1,9 @@
 use std::ffi::{c_void, CString};
 use std::os::raw::c_int;
+use std::ptr;
 use std::ptr::null_mut;
 use crate::error::AirgapError;
+use crate::ffi::ByteArray;
 
 #[repr(C)]
 pub struct CResult {
@@ -37,7 +39,7 @@ impl CResult {
             error_message: CString::new(error_message).unwrap().into_raw(), // Transfer ownership to caller
         }
     }
-    
+
     pub fn from_error(error: AirgapError) -> Self {
         let code = error.to_code() as c_int;
         let message = CString::new(error.to_string())
@@ -50,3 +52,6 @@ impl CResult {
         }
     }
 }
+
+
+

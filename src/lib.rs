@@ -6,7 +6,7 @@ pub mod ffi;
 #[cfg(target_os = "android")]
 pub mod ffi_android;
 mod error;
-mod ffi_result;
+mod c_result;
 
 pub use protocol::{Chunk};
 pub use encoder::{Encoder, QrConfig};

@@ -1,24 +1,60 @@
 // src/ffi - C FFI interface for iOS and Android
 
 use std::os::raw::c_int;
-use std::ptr;
-use std::slice;
+use std::{ptr, slice};
 
 // Only import when not generating bindings
 #[cfg(not(cbindgen))]
 use crate::{Decoder, Encoder};
 use crate::error::AirgapError;
-use crate::ffi_result::{CResult, AIRGAP_OK};
+use crate::c_result::{CResult, AIRGAP_OK};
 
 pub enum AirgapEncoder {}
 
 pub enum AirgapDecoder {}
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct ByteArray {
     pub data: *mut u8,
     pub len: usize,
 }
+
+#[repr(C)]
+pub struct QRResult {
+    pub chunk_number: usize,
+    pub total_chunk_count: usize,
+}
+
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn airgap_byte_array_free(array: ByteArray) {
+    if !array.is_null() {
+        let _ = Vec::from_raw_parts(array.data, array.len, array.len);
+    }
+}
+
+#[cfg(not(cbindgen))]
+impl ByteArray {
+    pub fn from_vec(mut vec: Vec<u8>) -> Self {
+        let data = vec.as_mut_ptr();
+        let len = vec.len();
+        std::mem::forget(vec);
+        Self { data, len }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            data: ptr::null_mut(),
+            len: 0,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.data.is_null()
+    }
+}
+
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_encoder_new(
@@ -162,11 +198,6 @@ pub unsafe extern "C" fn airgap_decoder_reset(decoder: *const AirgapDecoder) -> 
     AIRGAP_OK
 }
 
-#[repr(C)]
-pub struct QRResult {
-    pub chunk_number: usize,
-    pub total_chunk_count: usize,
-}
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_decoder_process_qr(
@@ -206,33 +237,5 @@ pub unsafe extern "C" fn airgap_decoder_get_data(
             CResult::from_success(Box::new(ByteArray::from_vec(vec)))
         }
         Err(err) => CResult::from_error(err),
-    }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn airgap_byte_array_free(array: ByteArray) {
-    if !array.is_null() {
-        let _ = Vec::from_raw_parts(array.data, array.len, array.len);
-    }
-}
-
-#[cfg(not(cbindgen))]
-impl ByteArray {
-    pub fn from_vec(mut vec: Vec<u8>) -> Self {
-        let data = vec.as_mut_ptr();
-        let len = vec.len();
-        std::mem::forget(vec);
-        Self { data, len }
-    }
-
-    pub fn empty() -> Self {
-        Self {
-            data: ptr::null_mut(),
-            len: 0,
-        }
-    }
-
-    pub fn is_null(&self) -> bool {
-        self.data.is_null()
     }
 }
