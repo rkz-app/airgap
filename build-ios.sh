@@ -19,22 +19,14 @@ cargo build --release --target aarch64-apple-ios-sim --lib
 echo "Building for iOS simulator (x86_64)..."
 cargo build --release --target x86_64-apple-ios --lib
 
-# Create universal dylib for simulator
-echo "Creating universal simulator dylib..."
-mkdir -p target/universal-sim/release
-lipo -create \
-    target/aarch64-apple-ios-sim/release/libairgap.dylib \
-    target/x86_64-apple-ios/release/libairgap.dylib \
-    -output target/universal-sim/release/libairgap.dylib
-
-# Helper function to compile ObjC wrapper and merge with Rust dylib
+# Helper function to compile ObjC wrapper and merge with Rust static lib
 compile_and_merge_objc() {
     local arch=$1
     local sdk=$2
-    local rust_dylib=$3
-    local output_dylib=$4
+    local rust_static_lib=$3
+    local output_static_lib=$4
 
-    echo "Compiling ObjC wrapper for ${arch} and merging..."
+    echo "Compiling ObjC wrapper for ${arch} and merging into static library..."
 
     local temp_dir="target/temp_objc_${arch}"
     mkdir -p "${temp_dir}"
@@ -46,7 +38,6 @@ compile_and_merge_objc() {
         -I./objc \
         -fobjc-arc \
         -fmodules \
-        -fPIC \
         -o "${temp_dir}/AGQRResult.o" \
         objc/AGQRResult.m
 
@@ -57,7 +48,6 @@ compile_and_merge_objc() {
         -I./objc \
         -fobjc-arc \
         -fmodules \
-        -fPIC \
         -o "${temp_dir}/AGEncoder.o" \
         objc/AGEncoder.m
 
@@ -68,22 +58,17 @@ compile_and_merge_objc() {
         -I./objc \
         -fobjc-arc \
         -fmodules \
-        -fPIC \
         -o "${temp_dir}/AGDecoder.o" \
         objc/AGDecoder.m
 
-    # Link ObjC object files with the Rust dylib
-    xcrun -sdk ${sdk} clang \
-        -arch ${arch} \
-        -dynamiclib \
-        -fobjc-arc \
-        -fobjc-link-runtime \
-        -framework Foundation \
-        -Wl,-force_load,"${rust_dylib}" \
+    # Create static library combining Rust static lib and ObjC object files
+    # Use libtool to create the combined static library
+    xcrun -sdk ${sdk} libtool -static \
+        -o "${output_static_lib}" \
+        "${rust_static_lib}" \
         "${temp_dir}/AGQRResult.o" \
         "${temp_dir}/AGEncoder.o" \
-        "${temp_dir}/AGDecoder.o" \
-        -o "${output_dylib}"
+        "${temp_dir}/AGDecoder.o"
 
     # Clean up temp files
     rm -rf "${temp_dir}"
@@ -92,7 +77,7 @@ compile_and_merge_objc() {
 # Helper function to create framework
 create_framework() {
     local framework_name=$1
-    local dylib_path=$2
+    local static_lib_path=$2
     local output_dir=$3
 
     echo "Creating framework: ${framework_name}"
@@ -101,8 +86,8 @@ create_framework() {
     rm -rf "${framework_dir}"
     mkdir -p "${framework_dir}/Headers"
 
-    # Copy dylib and rename to framework name
-    cp "${dylib_path}" "${framework_dir}/${framework_name}"
+    # Copy static library and rename to framework name
+    cp "${static_lib_path}" "${framework_dir}/${framework_name}"
 
     # Copy C headers
     cp -r include/* "${framework_dir}/Headers/"
@@ -163,37 +148,37 @@ MODULEMAP
 EOF
 }
 
-# Compile ObjC wrappers and merge with Rust dylibs
-echo "Compiling ObjC wrappers and creating combined dylibs..."
-mkdir -p target/combined-dylibs
+# Compile ObjC wrappers and merge with Rust static libs
+echo "Compiling ObjC wrappers and creating combined static libraries..."
+mkdir -p target/combined-static
 
 # Device (arm64)
 compile_and_merge_objc \
     "arm64" \
     "iphoneos" \
     "target/aarch64-apple-ios/release/libairgap.a" \
-    "target/combined-dylibs/libairgap-device.dylib"
+    "target/combined-static/libairgap-device.a"
 
 # Simulator arm64
 compile_and_merge_objc \
     "arm64" \
     "iphonesimulator" \
     "target/aarch64-apple-ios-sim/release/libairgap.a" \
-    "target/combined-dylibs/libairgap-sim-arm64.dylib"
+    "target/combined-static/libairgap-sim-arm64.a"
 
 # Simulator x86_64
 compile_and_merge_objc \
     "x86_64" \
     "iphonesimulator" \
     "target/x86_64-apple-ios/release/libairgap.a" \
-    "target/combined-dylibs/libairgap-sim-x86_64.dylib"
+    "target/combined-static/libairgap-sim-x86_64.a"
 
-# Create universal simulator dylib
-echo "Creating universal simulator dylib..."
+# Create universal simulator static library
+echo "Creating universal simulator static library..."
 lipo -create \
-    target/combined-dylibs/libairgap-sim-arm64.dylib \
-    target/combined-dylibs/libairgap-sim-x86_64.dylib \
-    -output target/combined-dylibs/libairgap-simulator.dylib
+    target/combined-static/libairgap-sim-arm64.a \
+    target/combined-static/libairgap-sim-x86_64.a \
+    -output target/combined-static/libairgap-simulator.a
 
 # Create framework directories
 echo "Creating frameworks..."
@@ -201,8 +186,8 @@ mkdir -p target/frameworks/device
 mkdir -p target/frameworks/simulator
 
 # Create frameworks
-create_framework "Airgap" "target/combined-dylibs/libairgap-device.dylib" "target/frameworks/device"
-create_framework "Airgap" "target/combined-dylibs/libairgap-simulator.dylib" "target/frameworks/simulator"
+create_framework "Airgap" "target/combined-static/libairgap-device.a" "target/frameworks/device"
+create_framework "Airgap" "target/combined-static/libairgap-simulator.a" "target/frameworks/simulator"
 
 # Create XCFramework
 echo "Creating XCFramework..."
