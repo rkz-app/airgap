@@ -3,7 +3,7 @@
 use jni::JNIEnv;
 use jni::objects::{JClass, JByteArray, JObject};
 use jni::sys::{jlong, jint, jboolean, jbyteArray};
-use crate::{Decoder, Encoder};
+use crate::{Decoder, Encoder, QrConfig};
 use crate::error::AirgapError;
 
 // Helper function to throw AirgapException
@@ -21,6 +21,7 @@ pub extern "system" fn Java_app_rkz_airgap_AirgapEncoder_nativeNew<'local>(
     _class: JClass<'local>,
     data: JByteArray<'local>,
     chunk_size: jint,
+    qr_size: jint,
 ) -> jlong {
     let data_bytes: Vec<u8> = match env.convert_byte_array(&data) {
         Ok(bytes) => bytes,
@@ -30,7 +31,7 @@ pub extern "system" fn Java_app_rkz_airgap_AirgapEncoder_nativeNew<'local>(
         }
     };
 
-    match Encoder::new(&data_bytes, chunk_size as usize) {
+    match Encoder::with_config(&data_bytes, chunk_size as usize, QrConfig::with_size(qr_size as u32)) {
         Ok(encoder) => Box::into_raw(Box::new(encoder)) as jlong,
         Err(err) => {
             throw_exception(&mut env, &err);

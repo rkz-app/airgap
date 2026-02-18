@@ -9,6 +9,14 @@ pub struct QrConfig {
     pub ec_level: EcLevel,
     pub qr_size: u32,
 }
+impl QrConfig {
+    pub fn with_size(size: u32) -> Self {
+        Self {
+            ec_level: EcLevel::M,
+            qr_size: size,
+        }
+    }
+}
 
 impl Default for QrConfig {
     fn default() -> Self {
@@ -17,6 +25,8 @@ impl Default for QrConfig {
             qr_size: 400,
         }
     }
+
+
 }
 
 pub struct Encoder {
@@ -124,7 +134,7 @@ impl Encoder {
 
 pub fn generate_image_from_chunk(chunk: &Chunk, config: &QrConfig) -> Result<DynamicImage, AirgapError> {
     let chunk_bytes = chunk.to_bytes();
-    let encoded = base45::encode_from_buffer(chunk_bytes);
+    let encoded = base45::encode(chunk_bytes);
     let code = QrCode::with_error_correction_level(&encoded, config.ec_level)
         .map_err(|e| AirgapError::EncodingError(e.to_string()))?;
 

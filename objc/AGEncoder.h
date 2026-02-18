@@ -24,6 +24,7 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (nullable instancetype)initWithData:(NSData *)data
                             chunkSize:(NSUInteger)chunkSize
+                                qrSize: (NSUInteger)qrSize
                                 error:(NSError **)error;
 
 /**

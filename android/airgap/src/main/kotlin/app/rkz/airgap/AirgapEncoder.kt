@@ -9,14 +9,15 @@ package app.rkz.airgap
  */
 class AirgapEncoder @Throws(AirgapException::class) constructor(
     data: ByteArray,
-    chunkSize: Int = RECOMMENDED_MAX_CHUNK_SIZE
+    chunkSize: Int = RECOMMENDED_MAX_CHUNK_SIZE,
+    qrSize: Int = 400
 ) : AutoCloseable {
 
     private var nativeHandle: Long = 0
 
     init {
         System.loadLibrary("airgap")
-        nativeHandle = nativeNew(data, chunkSize)
+        nativeHandle = nativeNew(data, chunkSize, qrSize)
     }
 
     /**
@@ -94,7 +95,7 @@ class AirgapEncoder @Throws(AirgapException::class) constructor(
     }
 
     // Native methods
-    private external fun nativeNew(data: ByteArray, chunkSize: Int): Long
+    private external fun nativeNew(data: ByteArray, chunkSize: Int, qrSize: Int): Long
     private external fun nativeFree(handle: Long)
     private external fun nativeChunkCount(handle: Long): Int
     private external fun nativeSessionId(handle: Long): Int

@@ -8,6 +8,7 @@ use std::{ptr, slice};
 use crate::{Decoder, Encoder};
 use crate::error::AirgapError;
 use crate::c_result::{CResult, AIRGAP_OK};
+use crate::QrConfig;
 
 pub enum AirgapEncoder {}
 
@@ -61,6 +62,7 @@ pub unsafe extern "C" fn airgap_encoder_new(
     data: *const u8,
     data_len: usize,
     chunk_size: usize,
+    qr_size: u32
 ) -> CResult {
     if data.is_null() {
         return CResult::from_error(AirgapError::UnknownError)
@@ -68,7 +70,7 @@ pub unsafe extern "C" fn airgap_encoder_new(
 
     let data_slice = unsafe { slice::from_raw_parts(data, data_len) };
 
-    match Encoder::new(data_slice, chunk_size) {
+    match Encoder::with_config(data_slice, chunk_size, QrConfig::with_size(qr_size)) {
         Ok(encoder) => CResult::from_success(Box::new(encoder)),
         Err(err) => CResult::from_error(err),
     }

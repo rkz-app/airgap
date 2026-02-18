@@ -16,10 +16,11 @@ static NSString *const AGEncoderErrorDomain = @"app.rkz.airgap.encoder";
 
 - (nullable instancetype)initWithData:(NSData *)data
                             chunkSize:(NSUInteger)chunkSize
+ 								qrSize: (NSUInteger)qrSize
                                 error:(NSError **)error {
     if (self = [super init]) {
         // Call Rust FFI - all validation is done on Rust side
-        struct CResult result = airgap_encoder_new(data.bytes, data.length, chunkSize);
+        struct CResult result = airgap_encoder_new(data.bytes, data.length, chunkSize, qrSize);
 
         if (result.code != AIRGAP_OK) {
             if (error) {
