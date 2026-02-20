@@ -11,7 +11,7 @@ rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-andro
 if [ -z "$ANDROID_NDK_HOME" ]; then
     echo "Error: ANDROID_NDK_HOME environment variable not set"
     echo "Please set it to your Android NDK installation path"
-    echo "Example: export ANDROID_NDK_HOME=~/Library/Android/sdk/ndk/26.1.10909125"
+    echo "Example: export ANDROID_NDK_HOME=~/Library/Android/sdk/ndk/27.0.12077973"
     exit 1
 fi
 
@@ -27,24 +27,28 @@ fi
 
 echo "Using NDK host platform: $NDK_HOST"
 
-# Create cargo config for Android
+# Create cargo config for Android with 16KB page size support
 mkdir -p .cargo
 cat > .cargo/config.toml << EOF
 [target.aarch64-linux-android]
 ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar"
-linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/aarch64-linux-android30-clang"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/aarch64-linux-android35-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.armv7-linux-androideabi]
 ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar"
-linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/armv7a-linux-androideabi30-clang"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/armv7a-linux-androideabi35-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.i686-linux-android]
 ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar"
-linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/i686-linux-android30-clang"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/i686-linux-android35-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.x86_64-linux-android]
 ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar"
-linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/x86_64-linux-android30-clang"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/x86_64-linux-android35-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 EOF
 
 # Build for Android targets
@@ -72,6 +76,14 @@ cp target/aarch64-linux-android/release/libairgap.so android/airgap/src/main/jni
 cp target/armv7-linux-androideabi/release/libairgap.so android/airgap/src/main/jniLibs/armeabi-v7a/
 cp target/i686-linux-android/release/libairgap.so android/airgap/src/main/jniLibs/x86/
 cp target/x86_64-linux-android/release/libairgap.so android/airgap/src/main/jniLibs/x86_64/
+
+# Verify 16KB page alignment on arm64 (the only arch where it matters)
+echo ""
+echo "Verifying 16KB page alignment for arm64-v8a..."
+
+$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-readelf \
+  -l android/airgap/src/main/jniLibs/arm64-v8a/libairgap.so \
+  | grep -i "load\|align" || true
 
 echo ""
 echo "Native libraries built successfully!"
