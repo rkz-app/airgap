@@ -143,6 +143,8 @@ MODULEMAP
     <string>0.1.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <key>MinimumOSVersion</key>
+    <string>12.0</string>
 </dict>
 </plist>
 EOF
