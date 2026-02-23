@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["rlib", "staticlib", "cdylib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 qrcode = "0.14"
@@ -17,3 +17,4 @@ jni = { version = "0.21.1", default-features = false }  # JNI support for all JV
 
 [build-dependencies]
 cbindgen = "0.29.2"
+cc = "1"
