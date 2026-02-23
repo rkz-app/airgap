@@ -3,128 +3,68 @@ set -e
 
 echo "Building Airgap library for Android..."
 
-# ---------------------------------------------------------
-# Verify NDK
-# ---------------------------------------------------------
+# Add Android targets
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android 2>/dev/null || true
+
 if [ -z "$ANDROID_NDK_HOME" ]; then
-    echo "ANDROID_NDK_HOME not set"
-    echo "Example:"
-    echo "export ANDROID_NDK_HOME=~/Library/Android/sdk/ndk/27.0.12077973"
+    echo "Error: ANDROID_NDK_HOME not set"
     exit 1
 fi
 
-# ---------------------------------------------------------
-# Detect NDK host (Apple Silicon safe)
-# ---------------------------------------------------------
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    NDK_HOST="darwin-x86_64"
-elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    NDK_HOST="linux-x86_64"
-else
-    echo "Unsupported host: $OSTYPE"
-    exit 1
+# Detect host platform properly
+HOST_TAG=$(basename "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/"*)
+echo "Using NDK host: $HOST_TAG"
+
+CLANG="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG/bin"
+
+# Ensure .cargo exists but DO NOT overwrite existing config
+mkdir -p .cargo
+
+if [ ! -f ".cargo/config.toml" ]; then
+cat > .cargo/config.toml <<EOF
+[target.aarch64-linux-android]
+linker = "$CLANG/aarch64-linux-android21-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
+
+[target.armv7-linux-androideabi]
+linker = "$CLANG/armv7a-linux-androideabi21-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
+
+[target.i686-linux-android]
+linker = "$CLANG/i686-linux-android21-clang"
+
+[target.x86_64-linux-android]
+linker = "$CLANG/x86_64-linux-android21-clang"
+EOF
 fi
 
-echo "Using NDK host: $NDK_HOST"
-
-# ---------------------------------------------------------
-# Add targets
-# ---------------------------------------------------------
-rustup target add \
-aarch64-linux-android \
-armv7-linux-androideabi \
-i686-linux-android \
-x86_64-linux-android 2>/dev/null || true
-
-# ---------------------------------------------------------
-# Isolated Android target directory
-# ---------------------------------------------------------
-export CARGO_TARGET_DIR=target-android
-
-# ---------------------------------------------------------
-# Common linker flags (16KB page size)
-# ---------------------------------------------------------
-RUSTFLAGS="-C link-arg=-Wl,-z,max-page-size=16384"
-
-# ---------------------------------------------------------
-# Build arm64 (primary ABI)
-# ---------------------------------------------------------
+# Build
 echo "Building arm64-v8a..."
-CC_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/aarch64-linux-android21-clang \
-AR_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar \
-RUSTFLAGS="$RUSTFLAGS" \
 cargo build --release --target aarch64-linux-android
 
-# ---------------------------------------------------------
-# Build armeabi-v7a
-# ---------------------------------------------------------
 echo "Building armeabi-v7a..."
-CC_armv7_linux_androideabi=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/armv7a-linux-androideabi21-clang \
-AR_armv7_linux_androideabi=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar \
-RUSTFLAGS="$RUSTFLAGS" \
 cargo build --release --target armv7-linux-androideabi
 
-# ---------------------------------------------------------
-# Build x86
-# ---------------------------------------------------------
 echo "Building x86..."
-CC_i686_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/i686-linux-android21-clang \
-AR_i686_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar \
-RUSTFLAGS="$RUSTFLAGS" \
 cargo build --release --target i686-linux-android
 
-# ---------------------------------------------------------
-# Build x86_64
-# ---------------------------------------------------------
 echo "Building x86_64..."
-CC_x86_64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/x86_64-linux-android21-clang \
-AR_x86_64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-ar \
-RUSTFLAGS="$RUSTFLAGS" \
 cargo build --release --target x86_64-linux-android
 
-# ---------------------------------------------------------
-# Copy into jniLibs
-# ---------------------------------------------------------
-JNI_DIR=android/airgap/src/main/jniLibs
+# Create jniLibs
+mkdir -p android/airgap/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86,x86_64}
 
-mkdir -p \
-$JNI_DIR/arm64-v8a \
-$JNI_DIR/armeabi-v7a \
-$JNI_DIR/x86 \
-$JNI_DIR/x86_64
+cp target/aarch64-linux-android/release/libairgap.so android/airgap/src/main/jniLibs/arm64-v8a/
+cp target/armv7-linux-androideabi/release/libairgap.so android/airgap/src/main/jniLibs/armeabi-v7a/
+cp target/i686-linux-android/release/libairgap.so android/airgap/src/main/jniLibs/x86/
+cp target/x86_64-linux-android/release/libairgap.so android/airgap/src/main/jniLibs/x86_64/
 
-cp target-android/aarch64-linux-android/release/libairgap.so $JNI_DIR/arm64-v8a/
-cp target-android/armv7-linux-androideabi/release/libairgap.so $JNI_DIR/armeabi-v7a/
-cp target-android/i686-linux-android/release/libairgap.so $JNI_DIR/x86/
-cp target-android/x86_64-linux-android/release/libairgap.so $JNI_DIR/x86_64/
-
-# ---------------------------------------------------------
-# Verify 16KB alignment (arm64 only)
-# ---------------------------------------------------------
-echo ""
-echo "Verifying 16KB page alignment..."
-
-$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin/llvm-readelf \
--l $JNI_DIR/arm64-v8a/libairgap.so
-
-# ---------------------------------------------------------
-# Build AAR
-# ---------------------------------------------------------
-echo ""
-echo "Building AAR..."
-
-cd android
-
-if [ -f "./gradlew" ]; then
-    chmod +x ./gradlew
-    ./gradlew :airgap:assembleRelease
-else
-    gradle :airgap:assembleRelease
+# Verify 16KB page alignment (arm64 only)
+if [ -f "$CLANG/llvm-readelf" ]; then
+    echo ""
+    echo "Checking arm64 alignment..."
+    "$CLANG/llvm-readelf" -l android/airgap/src/main/jniLibs/arm64-v8a/libairgap.so | grep -i align || true
 fi
 
-cd ..
-
 echo ""
-echo "✅ Android build complete"
-echo "AAR:"
-echo "android/airgap/build/outputs/aar/airgap-release.aar"
+echo "Android native libraries built successfully."
