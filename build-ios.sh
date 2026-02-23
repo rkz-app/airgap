@@ -6,8 +6,6 @@ echo "Building Airgap dynamic framework for iOS..."
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios 2>/dev/null || true
 
 # Clean to avoid old static contamination
-cargo clean
-
 # ---------------------------------------------------------
 # Build cdylib for device
 # ---------------------------------------------------------
@@ -33,33 +31,41 @@ create_framework() {
     local dylib_path=$1
     local output_dir=$2
 
-    mkdir -p "$output_dir/Airgap.framework/Headers"
-    mkdir -p "$output_dir/Airgap.framework/Modules"
+    local framework_dir="${output_dir}/Airgap.framework"
+    rm -rf "${framework_dir}"
+    mkdir -p "${framework_dir}/Headers"
+    mkdir -p "${framework_dir}/Modules"
 
     cp "$dylib_path" "$output_dir/Airgap.framework/Airgap"
 
-   cp -r include/* "${framework_dir}/Headers/"
+    # Copy ObjC headers
+    cp objc/AGQRResult.h "${framework_dir}/Headers/AGQRResult.h"
+    cp objc/AGEncoder.h "${framework_dir}/Headers/AGEncoder.h"
+    cp objc/AGDecoder.h "${framework_dir}/Headers/AGDecoder.h"
 
-       # Copy ObjC headers
-       cp objc/AGQRResult.h "${framework_dir}/Headers/"
-       cp objc/AGEncoder.h "${framework_dir}/Headers/"
-       cp objc/AGDecoder.h "${framework_dir}/Headers/"
+    # Create umbrella header
+    cat > "${framework_dir}/Headers/Airgap.h" <<UMBRELLA
+//
+//  Airgap.h
+//  Airgap
+//
 
-       # Create umbrella header
-       cat > "${framework_dir}/Headers/Airgap.h" <<UMBRELLA
-   //
-   //  Airgap.h
-   //  Airgap
-   //
+#import <Foundation/Foundation.h>
 
-   #import <Foundation/Foundation.h>
+#import "AGQRResult.h"
+#import "AGEncoder.h"
+#import "AGDecoder.h"
 
-   #import "AGQRResult.h"
-   #import "AGEncoder.h"
-   #import "AGDecoder.h"
-   UMBRELLA
-   //
+UMBRELLA
 
+    # Create Modules directory and modulemap
+    cat > "${framework_dir}/Modules/module.modulemap" <<MODULEMAP
+framework module Airgap {
+    umbrella header "Airgap.h"
+    export *
+    module * { export * }
+}
+MODULEMAP
 
 
     cat > "$output_dir/Airgap.framework/Info.plist" <<EOF
