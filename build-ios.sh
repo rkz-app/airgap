@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+
+export IPHONEOS_DEPLOYMENT_TARGET=12.0
+export RUSTFLAGS="-C link-arg=-miphoneos-version-min=12.0"
+
 echo "Building Airgap framework for iOS..."
 
 # Add iOS targets if not already added
@@ -26,6 +30,12 @@ compile_and_merge_objc() {
     local rust_static_lib=$3
     local output_static_lib=$4
 
+    if [ "$sdk" = "iphoneos" ]; then
+        MIN_FLAG="-miphoneos-version-min=12.0"
+    else
+        MIN_FLAG="-mios-simulator-version-min=12.0"
+    fi
+
     echo "Compiling ObjC wrapper for ${arch} and merging into static library..."
 
     local temp_dir="target/temp_objc_${arch}"
@@ -34,6 +44,7 @@ compile_and_merge_objc() {
     # Compile AGQRResult.m
     xcrun -sdk ${sdk} clang -c \
         -arch ${arch} \
+         ${MIN_FLAG} \
         -I./include \
         -I./objc \
         -fobjc-arc \
@@ -44,6 +55,7 @@ compile_and_merge_objc() {
     # Compile AGEncoder.m
     xcrun -sdk ${sdk} clang -c \
         -arch ${arch} \
+         ${MIN_FLAG} \
         -I./include \
         -I./objc \
         -fobjc-arc \
@@ -54,6 +66,7 @@ compile_and_merge_objc() {
     # Compile AGDecoder.m
     xcrun -sdk ${sdk} clang -c \
         -arch ${arch} \
+         ${MIN_FLAG} \
         -I./include \
         -I./objc \
         -fobjc-arc \
