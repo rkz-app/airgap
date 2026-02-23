@@ -37,15 +37,30 @@ create_framework() {
     mkdir -p "$output_dir/Airgap.framework/Modules"
 
     cp "$dylib_path" "$output_dir/Airgap.framework/Airgap"
-    cp include/airgap.h "$output_dir/Airgap.framework/Headers/"
 
-    cat > "$output_dir/Airgap.framework/Modules/module.modulemap" <<EOF
-framework module Airgap {
-    umbrella header "airgap.h"
-    export *
-    module * { export * }
-}
-EOF
+   cp -r include/* "${framework_dir}/Headers/"
+
+       # Copy ObjC headers
+       cp objc/AGQRResult.h "${framework_dir}/Headers/"
+       cp objc/AGEncoder.h "${framework_dir}/Headers/"
+       cp objc/AGDecoder.h "${framework_dir}/Headers/"
+
+       # Create umbrella header
+       cat > "${framework_dir}/Headers/Airgap.h" <<UMBRELLA
+   //
+   //  Airgap.h
+   //  Airgap
+   //
+
+   #import <Foundation/Foundation.h>
+
+   #import "AGQRResult.h"
+   #import "AGEncoder.h"
+   #import "AGDecoder.h"
+   UMBRELLA
+   //
+
+
 
     cat > "$output_dir/Airgap.framework/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
