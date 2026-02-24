@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-cargo clean
-
 TARGET=12.0
 
 export IPHONEOS_DEPLOYMENT_TARGET=$TARGET
@@ -20,13 +18,13 @@ cargo build --release --target x86_64-apple-ios
 build_dynamic() {
     local arch=$1
     local sdk=$2
-    local rust_dylib=$3
+    local rust_static=$3
     local output_dylib=$4
 
     if [ "$sdk" = "iphoneos" ]; then
-        MIN_FLAG="-miphoneos-version-min=12.0"
+        MIN_FLAG="-miphoneos-version-min=${TARGET}"
     else
-        MIN_FLAG="-mios-simulator-version-min=12.0"
+        MIN_FLAG="-mios-simulator-version-min=${TARGET}"
     fi
 
     local temp_dir="target/temp_${arch}"
@@ -73,10 +71,11 @@ build_dynamic() {
         -install_name @rpath/Airgap.framework/Airgap \
         -framework Foundation \
         -o "${output_dylib}" \
-        "${rust_dylib}" \
+        "${rust_static}" \
         "${temp_dir}/AGQRResult.o" \
         "${temp_dir}/AGEncoder.o" \
-        "${temp_dir}/AGDecoder.o"
+        "${temp_dir}/AGDecoder.o" \
+        -Wl,-force_load,"${rust_static}"
 }
 
 mkdir -p target/dynamic
@@ -85,21 +84,21 @@ mkdir -p target/dynamic
 build_dynamic \
     arm64 \
     iphoneos \
-    target/aarch64-apple-ios/release/libairgap.dylib \
+    target/aarch64-apple-ios/release/libairgap.a \
     target/dynamic/Airgap-device
 
 # Simulator arm64
 build_dynamic \
     arm64 \
     iphonesimulator \
-    target/aarch64-apple-ios-sim/release/libairgap.dylib \
+    target/aarch64-apple-ios-sim/release/libairgap.a \
     target/dynamic/Airgap-sim-arm64
 
 # Simulator x86_64
 build_dynamic \
     x86_64 \
     iphonesimulator \
-    target/x86_64-apple-ios/release/libairgap.dylib \
+    target/x86_64-apple-ios/release/libairgap.a \
     target/dynamic/Airgap-sim-x86_64
 
 # Create universal simulator dylib
