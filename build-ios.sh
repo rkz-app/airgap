@@ -3,8 +3,10 @@ set -e
 
 cargo clean
 
-export IPHONEOS_DEPLOYMENT_TARGET=12.0
-export RUSTFLAGS="-C link-arg=-miphoneos-version-min=12.0"
+TARGET=12.0
+
+export IPHONEOS_DEPLOYMENT_TARGET=$TARGET
+export RUSTFLAGS="-C link-arg=-miphoneos-version-min=${TARGET}"
 
 echo "Building dynamic Airgap framework..."
 
@@ -132,6 +134,24 @@ framework module Airgap {
     export *
     module * { export * }
 }
+EOF
+
+cat > "${framework_dir}/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Airgap</string>
+    <key>CFBundleIdentifier</key>
+    <string>app.rkz.Airgap</string>
+    <key>CFBundlePackageType</key>
+    <string>FMWK</string>
+    <key>MinimumOSVersion</key>
+    <string>${TARGET}</string>
+</dict>
+</plist>
 EOF
 }
 
