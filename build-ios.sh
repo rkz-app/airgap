@@ -1,33 +1,110 @@
 #!/bin/bash
 set -e
 
-echo "Building Airgap dynamic framework for iOS..."
-
 cargo clean
+
+export IPHONEOS_DEPLOYMENT_TARGET=12.0
+export RUSTFLAGS="-C link-arg=-miphoneos-version-min=12.0"
+
+echo "Building dynamic Airgap framework..."
 
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios 2>/dev/null || true
 
-# Clean to avoid old static contamination
-# ---------------------------------------------------------
-# Build cdylib for device
-# ---------------------------------------------------------
+# Build Rust dylibs
 cargo build --release --target aarch64-apple-ios
-
-# ---------------------------------------------------------
-# Build cdylib for simulator (arm64)
-# ---------------------------------------------------------
 cargo build --release --target aarch64-apple-ios-sim
-
-# ---------------------------------------------------------
-# Build cdylib for simulator (x86_64)
-# ---------------------------------------------------------
 cargo build --release --target x86_64-apple-ios
 
-# ---------------------------------------------------------
-# Create frameworks
-# ---------------------------------------------------------
-rm -rf build
-mkdir -p build/device build/simulator
+build_dynamic() {
+    local arch=$1
+    local sdk=$2
+    local rust_dylib=$3
+    local output_dylib=$4
+
+    if [ "$sdk" = "iphoneos" ]; then
+        MIN_FLAG="-miphoneos-version-min=12.0"
+    else
+        MIN_FLAG="-mios-simulator-version-min=12.0"
+    fi
+
+    local temp_dir="target/temp_${arch}"
+    mkdir -p "${temp_dir}"
+
+    echo "Compiling ObjC for ${arch}..."
+
+    xcrun -sdk ${sdk} clang -c \
+        -arch ${arch} \
+        ${MIN_FLAG} \
+        -fobjc-arc \
+        -fmodules \
+        -I./include \
+        -I./objc \
+        objc/AGQRResult.m \
+        -o "${temp_dir}/AGQRResult.o"
+
+    xcrun -sdk ${sdk} clang -c \
+        -arch ${arch} \
+        ${MIN_FLAG} \
+        -fobjc-arc \
+        -fmodules \
+        -I./include \
+        -I./objc \
+        objc/AGEncoder.m \
+        -o "${temp_dir}/AGEncoder.o"
+
+    xcrun -sdk ${sdk} clang -c \
+        -arch ${arch} \
+        ${MIN_FLAG} \
+        -fobjc-arc \
+        -fmodules \
+        -I./include \
+        -I./objc \
+        objc/AGDecoder.m \
+        -o "${temp_dir}/AGDecoder.o"
+
+    echo "Linking dynamic library for ${arch}..."
+
+    xcrun -sdk ${sdk} clang \
+        -arch ${arch} \
+        -dynamiclib \
+        ${MIN_FLAG} \
+        -install_name @rpath/Airgap.framework/Airgap \
+        -framework Foundation \
+        -o "${output_dylib}" \
+        "${rust_dylib}" \
+        "${temp_dir}/AGQRResult.o" \
+        "${temp_dir}/AGEncoder.o" \
+        "${temp_dir}/AGDecoder.o"
+}
+
+mkdir -p target/dynamic
+
+# Device
+build_dynamic \
+    arm64 \
+    iphoneos \
+    target/aarch64-apple-ios/release/libairgap.dylib \
+    target/dynamic/Airgap-device
+
+# Simulator arm64
+build_dynamic \
+    arm64 \
+    iphonesimulator \
+    target/aarch64-apple-ios-sim/release/libairgap.dylib \
+    target/dynamic/Airgap-sim-arm64
+
+# Simulator x86_64
+build_dynamic \
+    x86_64 \
+    iphonesimulator \
+    target/x86_64-apple-ios/release/libairgap.dylib \
+    target/dynamic/Airgap-sim-x86_64
+
+# Create universal simulator dylib
+lipo -create \
+    target/dynamic/Airgap-sim-arm64 \
+    target/dynamic/Airgap-sim-x86_64 \
+    -output target/dynamic/Airgap-simulator
 
 create_framework() {
     local dylib_path=$1
@@ -38,80 +115,37 @@ create_framework() {
     mkdir -p "${framework_dir}/Headers"
     mkdir -p "${framework_dir}/Modules"
 
-    cp "$dylib_path" "$output_dir/Airgap.framework/Airgap"
+    cp "${dylib_path}" "${framework_dir}/Airgap"
 
-    # Copy ObjC headers
-    cp objc/AGQRResult.h "${framework_dir}/Headers/AGQRResult.h"
-    cp objc/AGEncoder.h "${framework_dir}/Headers/AGEncoder.h"
-    cp objc/AGDecoder.h "${framework_dir}/Headers/AGDecoder.h"
+    cp objc/*.h "${framework_dir}/Headers/"
 
-    # Create umbrella header
-    cat > "${framework_dir}/Headers/Airgap.h" <<UMBRELLA
-//
-//  Airgap.h
-//  Airgap
-//
-
+    cat > "${framework_dir}/Headers/Airgap.h" <<EOF
 #import <Foundation/Foundation.h>
-
 #import "AGQRResult.h"
 #import "AGEncoder.h"
 #import "AGDecoder.h"
+EOF
 
-UMBRELLA
-
-    # Create Modules directory and modulemap
-    cat > "${framework_dir}/Modules/module.modulemap" <<MODULEMAP
+    cat > "${framework_dir}/Modules/module.modulemap" <<EOF
 framework module Airgap {
     umbrella header "Airgap.h"
     export *
     module * { export * }
 }
-MODULEMAP
-
-
-    cat > "$output_dir/Airgap.framework/Info.plist" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
- "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>Airgap</string>
-    <key>CFBundleIdentifier</key>
-    <string>app.rkz.Airgap</string>
-    <key>CFBundlePackageType</key>
-    <string>FMWK</string>
-    <key>MinimumOSVersion</key>
-    <string>12.0</string>
-</dict>
-</plist>
 EOF
 }
 
-# Device
-create_framework \
-target/aarch64-apple-ios/release/libairgap.dylib \
-build/device
+mkdir -p target/frameworks/device
+mkdir -p target/frameworks/simulator
 
-# Simulator (merge both arches)
-lipo -create \
-target/aarch64-apple-ios-sim/release/libairgap.dylib \
-target/x86_64-apple-ios/release/libairgap.dylib \
--output build/simulator/libairgap_sim.dylib
+create_framework target/dynamic/Airgap-device target/frameworks/device
+create_framework target/dynamic/Airgap-simulator target/frameworks/simulator
 
-create_framework \
-build/simulator/libairgap_sim.dylib \
-build/simulator
-
-# ---------------------------------------------------------
-# Create XCFramework
-# ---------------------------------------------------------
 rm -rf Airgap.xcframework
 
 xcodebuild -create-xcframework \
--framework build/device/Airgap.framework \
--framework build/simulator/Airgap.framework \
--output Airgap.xcframework
+    -framework target/frameworks/device/Airgap.framework \
+    -framework target/frameworks/simulator/Airgap.framework \
+    -output Airgap.xcframework
 
-echo "✅ XCFramework created"
+echo "Dynamic XCFramework created."
