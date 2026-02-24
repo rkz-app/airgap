@@ -149,6 +149,16 @@ cat > "${framework_dir}/Info.plist" <<EOF
     <string>FMWK</string>
     <key>MinimumOSVersion</key>
     <string>${TARGET}</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Airgap</string>
+    <key>CFBundlePackageType</key>
+    <string>FMWK</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
 </dict>
 </plist>
 EOF
