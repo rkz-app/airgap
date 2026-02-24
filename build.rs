@@ -42,5 +42,6 @@ fn main() {
             .compile("airgap_objc");
 
         println!("cargo:rustc-link-lib=framework=Foundation");
+        println!("cargo:rustc-link-lib=static=airgap_objc");
     }
 }
