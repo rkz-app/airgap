@@ -3,6 +3,8 @@ set -e
 
 echo "Building Airgap dynamic framework for iOS..."
 
+cargo clean
+
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios 2>/dev/null || true
 
 # Clean to avoid old static contamination

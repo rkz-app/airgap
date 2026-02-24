@@ -25,23 +25,31 @@ fn main() {
     println!("cargo:rerun-if-changed=src/");
     println!("cargo:rerun-if-changed=cbindgen.toml");
 
-    // =========================================================
-    // 2️⃣ iOS only: compile ObjC
-    // =========================================================
-    if target.contains("apple-ios") {
 
-        cc::Build::new()
+    if target.contains("apple-ios") {
+        let mut build = cc::Build::new();
+
+        build
             .files([
                 "objc/AGQRResult.m",
                 "objc/AGEncoder.m",
                 "objc/AGDecoder.m",
             ])
             .flag("-fobjc-arc")
-            .include("include")   // <-- header is here now
+            .flag("-miphoneos-version-min=10.0")
+            .include("include")
             .include("objc")
             .compile("airgap_objc");
 
-        println!("cargo:rustc-link-lib=framework=Foundation");
+        let out_dir = env::var("OUT_DIR").unwrap();
+
+        println!("cargo:rustc-link-search=native={}", out_dir);
         println!("cargo:rustc-link-lib=static=airgap_objc");
+
+        println!("cargo:rustc-link-lib=framework=Foundation");
+        println!("cargo:rustc-link-lib=framework=CoreFoundation");
+        println!("cargo:rustc-link-lib=objc");
+
+        println!("cargo:rustc-link-arg=-Wl,-ObjC");
     }
 }
