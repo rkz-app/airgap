@@ -56,9 +56,11 @@ rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.i686-linux-android]
 linker = "$CLANG/i686-linux-android21-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.x86_64-linux-android]
 linker = "$CLANG/x86_64-linux-android21-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 EOF
 fi
 
