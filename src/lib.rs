@@ -3,6 +3,8 @@ pub mod encoder;
 pub mod decoder;
 pub mod ffi;
 pub mod ffi_android;  // JNI bindings for all JVM targets (Android, desktop Java/Kotlin)
+#[cfg(target_arch = "wasm32")]
+pub mod ffi_wasm;
 mod error;
 mod c_result;
 

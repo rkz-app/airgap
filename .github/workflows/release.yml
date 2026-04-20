@@ -125,8 +125,51 @@ jobs:
         path: Airgap.xcframework.zip
         if-no-files-found: error
 
+  build-js:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Add WASM target
+      run: rustup target add wasm32-unknown-unknown
+
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-js-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-js-
+
+    - name: Build WASM package
+      run: wasm-pack build --release --target web --out-dir pkg
+
+    - name: Pack npm tarball
+      run: npm pack --pack-destination ..
+      working-directory: pkg
+
+    - name: Upload WASM artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: airgap-js-wasm
+        path: airgap-*.tgz
+        if-no-files-found: error
+
   create-release:
-    needs: [build-android, build-ios]
+    needs: [build-android, build-ios, build-js]
     runs-on: ubuntu-latest
 
     steps:
@@ -140,12 +183,18 @@ jobs:
       with:
         name: airgap-ios-xcframework
 
+    - name: Download JS WASM package
+      uses: actions/download-artifact@v4
+      with:
+        name: airgap-js-wasm
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
           airgap-release.aar
           Airgap.xcframework.zip
+          airgap-*.tgz
         draft: false
         prerelease: false
         generate_release_notes: true
