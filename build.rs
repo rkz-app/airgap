@@ -2,16 +2,16 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    // Skip cbindgen for embedded/cross-compilation builds (std feature not enabled)
-    if std::env::var("CARGO_FEATURE_STD").is_err() {
-        return;
-    }
-
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let header_path = PathBuf::from(&crate_dir)
         .join("include")
         .join("airgap.h");
     std::fs::create_dir_all(header_path.parent().unwrap()).unwrap();
+
+    // Always generate C header via cbindgen so build-embedded.sh can copy it.
+    // When building with --no-default-features, cbindgen naturally excludes
+    // #[cfg(feature = "std")] and #[cfg(feature = "qr")] items, producing
+    // a header that matches the embedded symbols exactly (no guards needed).
     cbindgen::Builder::new()
         .with_crate(&crate_dir)
         .with_config(cbindgen::Config::from_file("cbindgen.toml").unwrap())
@@ -19,7 +19,9 @@ fn main() {
         .expect("Unable to generate bindings")
         .write_to_file(&header_path);
 
-    // Wrap embedded-unavailable functions in #ifndef AIRGAP_EMBEDDED guards
+    // Always add #ifndef AIRGAP_EMBEDDED guards so the same header works
+    // for both full and embedded builds. cbindgen doesn't respect #[cfg]
+    // features, so it always outputs every function declaration.
     add_embedded_guards(&header_path);
 
     println!("cargo:rerun-if-changed=src/");
