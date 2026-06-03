@@ -1,9 +1,12 @@
+use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
+use alloc::format;
+use alloc::string::ToString;
 use crate::protocol::*;
-use std::collections::HashMap;
 use crate::error::AirgapError;
 
 pub struct Decoder {
-    received_chunks: HashMap<u16, Vec<u8>>,
+    received_chunks: BTreeMap<u16, Vec<u8>>,
     session_id: Option<u32>,
     total_chunks: Option<u16>,
 }
@@ -11,7 +14,7 @@ pub struct Decoder {
 impl Decoder {
     pub fn new() -> Self {
         Self {
-            received_chunks: HashMap::new(),
+            received_chunks: BTreeMap::new(),
             session_id: None,
             total_chunks: None,
         }
@@ -36,7 +39,7 @@ impl Decoder {
         if self.total_chunks.unwrap() != chunk.total_chunks {
             return Err(AirgapError::MetadataMismatch)
         }
-        
+
         if Some(chunk.session_id) != self.session_id {
             return Err(AirgapError::SessionMismatch);
         }

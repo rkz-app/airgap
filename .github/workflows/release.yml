@@ -168,8 +168,54 @@ jobs:
         path: airgap-*.tgz
         if-no-files-found: error
 
+  build-embedded:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Add embedded targets
+      run: |
+        rustup target add thumbv7em-none-eabihf
+        rustup target add thumbv7m-none-eabi
+        rustup target add thumbv6m-none-eabi
+
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-embedded-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-embedded-
+
+    - name: Build embedded libraries
+      run: |
+        chmod +x build-embedded.sh
+        ./build-embedded.sh
+
+    - name: Create archive
+      run: |
+        cd target/embedded
+        tar czf ../../airgap-embedded.tar.gz *.a airgap.h
+
+    - name: Upload embedded artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: airgap-embedded
+        path: airgap-embedded.tar.gz
+        if-no-files-found: error
+
   create-release:
-    needs: [build-android, build-ios, build-js]
+    needs: [build-android, build-ios, build-js, build-embedded]
     runs-on: ubuntu-latest
 
     steps:
@@ -188,6 +234,11 @@ jobs:
       with:
         name: airgap-js-wasm
 
+    - name: Download Embedded libraries
+      uses: actions/download-artifact@v4
+      with:
+        name: airgap-embedded
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
@@ -195,6 +246,7 @@ jobs:
           airgap-release.aar
           Airgap.xcframework.zip
           airgap-*.tgz
+          airgap-embedded.tar.gz
         draft: false
         prerelease: false
         generate_release_notes: true

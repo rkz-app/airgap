@@ -1,17 +1,64 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
+
+// Provide system allocator for host-based no_std builds (testing/development)
+// Embedded targets (target_os = "none") provide their own #[global_allocator]
+#[cfg(all(
+    not(feature = "std"),
+    not(target_arch = "wasm32"),
+    not(target_os = "none")
+))]
+extern crate std;
+#[cfg(all(
+    not(feature = "std"),
+    not(target_arch = "wasm32"),
+    not(target_os = "none")
+))]
+#[global_allocator]
+static GLOBAL: std::alloc::System = std::alloc::System;
+
+// Stub allocator + panic handler for CI builds targeting embedded.
+// Produces a linkable .a — real firmware must provide its own.
+#[cfg(all(
+    not(feature = "std"),
+    not(target_arch = "wasm32"),
+    target_os = "none"
+))]
+mod ci_stubs {
+    use core::alloc::{GlobalAlloc, Layout};
+    use core::panic::PanicInfo;
+
+    struct CiAlloc;
+    unsafe impl GlobalAlloc for CiAlloc {
+        unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
+            core::ptr::null_mut()
+        }
+        unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}
+    }
+    #[global_allocator]
+    static GLOBAL: CiAlloc = CiAlloc;
+
+    #[panic_handler]
+    fn panic(_info: &PanicInfo) -> ! {
+        loop {}
+    }
+}
+
 pub mod protocol;
 pub mod encoder;
 pub mod decoder;
 pub mod ffi;
+#[cfg(feature = "std")]
 pub mod ffi_android;  // JNI bindings for all JVM targets (Android, desktop Java/Kotlin)
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(feature = "std", target_arch = "wasm32"))]
 pub mod ffi_wasm;
 mod error;
 mod c_result;
 
-pub use protocol::{Chunk};
+pub use protocol::Chunk;
 pub use encoder::{Encoder, QrConfig};
 pub use decoder::Decoder;
-pub use qrcode::EcLevel;
+pub use error::EcLevel;
 
 #[cfg(test)]
 mod tests {
@@ -43,17 +90,18 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "qr")]
     fn test_ml_kem_key() {
 
         let pubkey = vec![0xAB; 1568];
 
         let encoder = Encoder::new(&pubkey, 780).unwrap();
-        
+
         assert_eq!(encoder.chunk_count(), 3);
-        
+
         let pngs = encoder.generate_png_bytes().unwrap();
         assert_eq!(pngs.len(), 3);
-        
+
         for png in pngs {
             assert!(png.len() > 1000); // PNG has overhead
         }

@@ -1,15 +1,15 @@
-use std::ffi::{c_void, CString};
-use std::os::raw::c_int;
-use std::ptr;
-use std::ptr::null_mut;
+use core::ffi::{c_void, c_char, c_int};
+use core::ptr::null_mut;
+use alloc::ffi::CString;
+use alloc::boxed::Box;
+use alloc::string::{String, ToString};
 use crate::error::AirgapError;
-use crate::ffi::ByteArray;
 
 #[repr(C)]
 pub struct CResult {
     pub code: c_int,
     pub payload: *const c_void,
-    pub error_message: *const std::os::raw::c_char,
+    pub error_message: *const c_char,
 }
 
 pub const AIRGAP_OK: c_int = 0;
@@ -52,6 +52,3 @@ impl CResult {
         }
     }
 }
-
-
-

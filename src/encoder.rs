@@ -1,7 +1,13 @@
 // encoder.rs
+use alloc::vec::Vec;
+use alloc::string::String;
 use crate::error::AirgapError;
+use crate::error::EcLevel;
 use crate::protocol::*;
-use qrcode::{QrCode, EcLevel};
+
+#[cfg(feature = "qr")]
+use qrcode::QrCode;
+#[cfg(feature = "qr")]
 use image::{DynamicImage, Luma};
 
 #[derive(Debug, Clone)]
@@ -25,31 +31,24 @@ impl Default for QrConfig {
             qr_size: 400,
         }
     }
-
-
 }
 
 pub struct Encoder {
     chunks: Vec<Chunk>,
     session_id: u32,
+    #[cfg(feature = "qr")]
     config: QrConfig,
 }
 
 impl Encoder {
-    pub fn new(
+    /// Core constructor with explicit session_id — always available.
+    /// Use this on embedded targets where you control entropy.
+    pub fn with_session_id(
         data: &[u8],
         chunk_size: usize,
+        session_id: u32,
     ) -> Result<Self, AirgapError> {
-        Self::with_config(data, chunk_size, QrConfig::default())
-    }
-
-    pub fn with_config(
-        data: &[u8],
-        chunk_size: usize,
-        config: QrConfig,
-    ) -> Result<Self, AirgapError> {
-
-        if data.len() == 0 {
+        if data.is_empty() {
             return Err(AirgapError::EmptyData);
         }
 
@@ -66,6 +65,7 @@ impl Encoder {
         }
 
         // Warn if using very large chunk size (won't scan well)
+        #[cfg(feature = "std")]
         if chunk_size > RECOMMENDED_MAX_CHUNK_SIZE {
             eprintln!(
                 "Warning: chunk size {} exceeds recommended maximum {}. \
@@ -80,7 +80,6 @@ impl Encoder {
             return Err(AirgapError::TooManyChunks(total_chunks));
         }
 
-        let session_id = rand::random::<u32>();
         let mut chunks = Vec::with_capacity(total_chunks);
 
         for i in 0..total_chunks {
@@ -101,11 +100,37 @@ impl Encoder {
         Ok(Self {
             chunks,
             session_id,
-            config,
+            #[cfg(feature = "qr")]
+            config: QrConfig::default(),
         })
     }
+
+    /// Standard constructor — generates random session_id.
+    /// Only available when `std` feature is enabled (needs rand).
+    #[cfg(feature = "std")]
+    pub fn new(
+        data: &[u8],
+        chunk_size: usize,
+    ) -> Result<Self, AirgapError> {
+        let session_id = rand::random::<u32>();
+        Self::with_session_id(data, chunk_size, session_id)
+    }
+
+    /// Constructor with full config — generates random session_id.
+    /// Only available when `qr` feature is enabled (needs rand + QrConfig).
+    #[cfg(feature = "qr")]
+    pub fn with_config(
+        data: &[u8],
+        chunk_size: usize,
+        config: QrConfig,
+    ) -> Result<Self, AirgapError> {
+        let mut encoder = Self::with_session_id(data, chunk_size, rand::random::<u32>())?;
+        encoder.config = config;
+        Ok(encoder)
+    }
+
     pub fn get_qr_string(&self, index: usize) -> Result<String, AirgapError> {
-        if (index > self.chunks.len() - 1) {
+        if index > self.chunks.len() - 1 {
             return Err(AirgapError::ChunkOutOfBounds(index as u16))
         }
         let chunk_bytes = self.chunks[index].to_bytes();
@@ -118,12 +143,16 @@ impl Encoder {
     pub fn chunk_count(&self) -> usize {
         self.chunks.len()
     }
+
+    #[cfg(feature = "qr")]
     pub fn generate_png_bytes(&self) -> Result<Vec<Vec<u8>>, AirgapError> {
         let images = generate_images_from_chunks(&self.chunks, &self.config)?;
         generate_pngs_bytes(images)
     }
+
+    #[cfg(feature = "qr")]
     pub fn generate_png_bytes_for_item(&self, index: usize) ->  Result<Vec<u8>, AirgapError> {
-        if (index > self.chunk_count()) {
+        if index >= self.chunk_count() {
             return Err(AirgapError::ChunkOutOfBounds(index as u16))
         }
         let image = generate_image_from_chunk(&self.chunks[index], &self.config)?;
@@ -132,10 +161,17 @@ impl Encoder {
 }
 
 
+#[cfg(feature = "qr")]
 pub fn generate_image_from_chunk(chunk: &Chunk, config: &QrConfig) -> Result<DynamicImage, AirgapError> {
     let chunk_bytes = chunk.to_bytes();
     let encoded = base45::encode(chunk_bytes);
-    let code = QrCode::with_error_correction_level(&encoded, config.ec_level)
+    let ec = match config.ec_level {
+        EcLevel::L => qrcode::EcLevel::L,
+        EcLevel::M => qrcode::EcLevel::M,
+        EcLevel::Q => qrcode::EcLevel::Q,
+        EcLevel::H => qrcode::EcLevel::H,
+    };
+    let code = QrCode::with_error_correction_level(&encoded, ec)
         .map_err(|e| AirgapError::EncodingError(e.to_string()))?;
 
     let image = code.render::<Luma<u8>>()
@@ -144,6 +180,7 @@ pub fn generate_image_from_chunk(chunk: &Chunk, config: &QrConfig) -> Result<Dyn
     Ok(DynamicImage::ImageLuma8(image))
 }
 
+#[cfg(feature = "qr")]
 pub fn generate_images_from_chunks(chunks: &Vec<Chunk>, qr_config: &QrConfig) -> Result<Vec<DynamicImage>, AirgapError> {
     let mut images = Vec::with_capacity(chunks.len());
     for chunk in chunks {
@@ -152,6 +189,7 @@ pub fn generate_images_from_chunks(chunks: &Vec<Chunk>, qr_config: &QrConfig) ->
     Ok(images)
 }
 
+#[cfg(feature = "qr")]
 pub fn generate_png_bytes(image: &DynamicImage) -> Result<Vec<u8>, AirgapError> {
     let mut bytes = Vec::new();
     image.write_to(
@@ -161,12 +199,11 @@ pub fn generate_png_bytes(image: &DynamicImage) -> Result<Vec<u8>, AirgapError> 
     Ok(bytes)
 }
 
+#[cfg(feature = "qr")]
 pub fn generate_pngs_bytes(images: Vec<DynamicImage>) -> Result<Vec<Vec<u8>>, AirgapError> {
     let mut png_bytes = Vec::with_capacity(images.len());
-
     for img in &images {
         png_bytes.push(generate_png_bytes(img)?);
     }
-
     Ok(png_bytes)
 }

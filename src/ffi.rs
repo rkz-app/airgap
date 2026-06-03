@@ -1,13 +1,20 @@
 // src/ffi - C FFI interface for iOS and Android
 
-use std::os::raw::c_int;
-use std::{ptr, slice};
+use core::ffi::c_char;
+use core::ffi::c_int;
+use core::ffi::CStr;
+use core::{ptr, slice};
+use alloc::ffi::CString;
+use alloc::boxed::Box;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 
 // Only import when not generating bindings
 #[cfg(not(cbindgen))]
 use crate::{Decoder, Encoder};
 use crate::error::AirgapError;
 use crate::c_result::{CResult, AIRGAP_OK};
+#[cfg(feature = "qr")]
 use crate::QrConfig;
 
 pub enum AirgapEncoder {}
@@ -40,7 +47,7 @@ impl ByteArray {
     pub fn from_vec(mut vec: Vec<u8>) -> Self {
         let data = vec.as_mut_ptr();
         let len = vec.len();
-        std::mem::forget(vec);
+        core::mem::forget(vec);
         Self { data, len }
     }
 
@@ -57,6 +64,7 @@ impl ByteArray {
 }
 
 
+#[cfg(feature = "std")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_encoder_new(
     data: *const u8,
@@ -75,6 +83,26 @@ pub unsafe extern "C" fn airgap_encoder_new(
         Err(err) => CResult::from_error(err),
     }
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn airgap_encoder_new_with_session_id(
+    data: *const u8,
+    data_len: usize,
+    chunk_size: usize,
+    session_id: u32,
+) -> CResult {
+    if data.is_null() {
+        return CResult::from_error(AirgapError::UnknownError)
+    }
+
+    let data_slice = unsafe { slice::from_raw_parts(data, data_len) };
+
+    match Encoder::with_session_id(data_slice, chunk_size, session_id) {
+        Ok(encoder) => CResult::from_success(Box::new(encoder)),
+        Err(err) => CResult::from_error(err),
+    }
+}
+
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_encoder_free(encoder: *mut AirgapEncoder) {
@@ -115,7 +143,7 @@ pub unsafe extern "C" fn airgap_encoder_get_qr_string(
         }
     };
 
-    let c_string = match std::ffi::CString::new(qr_string) {
+    let c_string = match CString::new(qr_string) {
         Ok(s) => s,
         Err(_) => {
             return CResult::from_custom_error("Failed to create C string".to_string(), -1);
@@ -125,6 +153,7 @@ pub unsafe extern "C" fn airgap_encoder_get_qr_string(
     CResult::from_success(Box::new(ByteArray::from_vec(c_string.into_bytes_with_nul())))
 }
 
+#[cfg(feature = "qr")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_encoder_generate_png(
     encoder: *const AirgapEncoder,
@@ -204,7 +233,7 @@ pub unsafe extern "C" fn airgap_decoder_reset(decoder: *const AirgapDecoder) -> 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_decoder_process_qr(
     decoder: *mut AirgapDecoder,
-    qr_string: *const std::os::raw::c_char,
+    qr_string: *const c_char,
 ) -> CResult {
     if decoder.is_null() {
         return CResult::from_custom_error("decoder null ptr".to_string(), -1);
@@ -214,7 +243,7 @@ pub unsafe extern "C" fn airgap_decoder_process_qr(
         return CResult::from_custom_error("qr_string null ptr".to_string(), -1);
     }
 
-    let c_str = std::ffi::CStr::from_ptr(qr_string);
+    let c_str = CStr::from_ptr(qr_string);
     let qr_data = match c_str.to_str() {
         Ok(s) => s,
         Err(_) => return CResult::from_custom_error("c str conv".to_string(), -2),

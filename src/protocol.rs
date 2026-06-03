@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use crate::error::AirgapError;
 
 pub const MAGIC: [u8; 2] = [0x19, 0xF7];

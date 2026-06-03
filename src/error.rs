@@ -1,33 +1,54 @@
+use core::fmt;
+use alloc::string::String;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EcLevel {
+    L,
+    M,
+    Q,
+    H,
+}
 
 #[cfg(not(cbindgen))]
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum AirgapError {
-    #[error("Unknown error")]
     UnknownError,
-    #[error("Invalid magic bytes")]
     InvalidMagic,
-    #[error("Unsupported version: {0}")]
     UnsupportedVersion(u8),
-    #[error("CRC mismatch")]
     CrcMismatch,
-    #[error("Session ID mismatch")]
     SessionMismatch,
-    #[error("Metadata mismatch")]
     MetadataMismatch,
-    #[error("Chunk index {0} out of bounds")]
     ChunkOutOfBounds(u16),
-    #[error("Too many chunks: {0} (max 65535)")]
     TooManyChunks(usize),
-    #[error("Chunk size {0} exceeds maximum {1}")]
     ChunkSizeTooLarge(usize, usize),
-    #[error("Chunk size {0} below minimum {1}")]
     ChunkSizeTooSmall(usize, usize),
-    #[error("Missing chunk {0}")]
     MissingChunk(u16),
-    #[error("Encoding error: {0}")]
     EncodingError(String),
-    #[error("Empty data for encoder")]
     EmptyData,
+}
+
+// When std feature is enabled, derive std::error::Error via thiserror
+#[cfg(all(not(cbindgen), feature = "std"))]
+impl std::error::Error for AirgapError {}
+
+impl fmt::Display for AirgapError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnknownError => write!(f, "Unknown error"),
+            Self::InvalidMagic => write!(f, "Invalid magic bytes"),
+            Self::UnsupportedVersion(v) => write!(f, "Unsupported version: {v}"),
+            Self::CrcMismatch => write!(f, "CRC mismatch"),
+            Self::SessionMismatch => write!(f, "Session ID mismatch"),
+            Self::MetadataMismatch => write!(f, "Metadata mismatch"),
+            Self::ChunkOutOfBounds(i) => write!(f, "Chunk index {i} out of bounds"),
+            Self::TooManyChunks(n) => write!(f, "Too many chunks: {n} (max 65535)"),
+            Self::ChunkSizeTooLarge(sz, max) => write!(f, "Chunk size {sz} exceeds maximum {max}"),
+            Self::ChunkSizeTooSmall(sz, min) => write!(f, "Chunk size {sz} below minimum {min}"),
+            Self::MissingChunk(i) => write!(f, "Missing chunk {i}"),
+            Self::EncodingError(e) => write!(f, "Encoding error: {e}"),
+            Self::EmptyData => write!(f, "Empty data for encoder"),
+        }
+    }
 }
 
 pub const AIRGAP_UNKNOWN_ERR: i32 = -10;
@@ -63,5 +84,4 @@ impl AirgapError {
             AirgapError::EmptyData => AIRGAP_ERR_EMPTY_DATA,
         }
     }
-
 }

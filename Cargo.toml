@@ -6,18 +6,21 @@ edition = "2024"
 [lib]
 crate-type = ["staticlib", "cdylib"]
 
-[dependencies]
-qrcode = "0.14"
-image = "0.25"
-base45 = "3.2.0"
-crc32fast = "1.4"
-rand = "0.10.0"
-thiserror = "2.0.18"
-jni = { version = "0.21.1", default-features = false }  # JNI support for all JVM targets
+[features]
+default = ["std", "qr"]
+std = ["dep:thiserror", "dep:jni"]
+qr = ["dep:qrcode", "dep:image", "dep:rand"]
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "=0.2.100"
-getrandom = { version = "0.4", features = ["wasm_js"] }
+[dependencies]
+base45 = { version = "3.2.0", default-features = false }
+crc32fast = { version = "1.4", default-features = false }
+thiserror = { version = "2.0.18", optional = true }
+qrcode = { version = "0.14", optional = true }
+image = { version = "0.25", optional = true }
+rand = { version = "0.10.0", optional = true }
+jni = { version = "0.21.1", default-features = false, optional = true }
+wasm-bindgen = { version = "=0.2.100", optional = true }
+getrandom = { version = "0.4", features = ["wasm_js"], optional = true }
 
 [build-dependencies]
 cbindgen = "0.29.2"
