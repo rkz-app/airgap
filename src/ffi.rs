@@ -221,6 +221,34 @@ pub unsafe extern "C" fn airgap_decoder_get_session_id(decoder: *const AirgapDec
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn airgap_decoder_get_received_indices(
+    decoder: *const AirgapDecoder,
+    out_indices: *mut *mut u16,
+    out_count: *mut usize,
+) -> c_int {
+    if decoder.is_null() || out_indices.is_null() || out_count.is_null() {
+        return -1;
+    }
+
+    let mut indices: Vec<u16> = (*(decoder as *const Decoder)).received_indices().collect();
+    indices.shrink_to_fit();
+    *out_count = indices.len();
+    *out_indices = indices.as_mut_ptr();
+    core::mem::forget(indices);
+    0
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn airgap_decoder_free_indices(
+    indices: *mut u16,
+    count: usize,
+) {
+    if !indices.is_null() {
+        let _ = Vec::from_raw_parts(indices, count, count);
+    }
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_decoder_reset(decoder: *const AirgapDecoder) -> c_int{
     if decoder.is_null() {
         return -1;

@@ -2,7 +2,7 @@
 
 use jni::JNIEnv;
 use jni::objects::{JClass, JByteArray, JObject};
-use jni::sys::{jlong, jint, jboolean, jbyteArray};
+use jni::sys::{jlong, jint, jboolean, jbyteArray, jintArray};
 use crate::{Decoder, Encoder, QrConfig};
 use crate::error::AirgapError;
 
@@ -212,6 +212,27 @@ pub extern "system" fn Java_app_rkz_airgap_AirgapDecoder_nativeGetSessionId(
     }
     let decoder = unsafe { &*(handle as *const Decoder) };
     decoder.session_id().map(|id| id as jint).unwrap_or(-1)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_app_rkz_airgap_AirgapDecoder_nativeGetReceivedIndices<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) -> jintArray {
+    if handle == 0 {
+        return JObject::null().into_raw();
+    }
+    let decoder = unsafe { &*(handle as *const Decoder) };
+    let indices: Vec<i32> = decoder.received_indices().map(|i| i as i32).collect();
+    let arr = match env.new_int_array(indices.len() as i32) {
+        Ok(a) => a,
+        Err(_) => return JObject::null().into_raw(),
+    };
+    if let Err(_) = env.set_int_array_region(&arr, 0, &indices) {
+        return JObject::null().into_raw();
+    }
+    arr.into_raw()
 }
 
 #[unsafe(no_mangle)]

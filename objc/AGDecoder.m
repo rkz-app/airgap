@@ -49,6 +49,25 @@ static NSString *const AGDecoderErrorDomain = @"app.rkz.airgap.decoder";
     return airgap_decoder_get_session_id(_decoder);
 }
 
+- (NSIndexSet *)receivedIndices {
+    if (!_decoder) return [NSIndexSet indexSet];
+
+    uint16_t *indices = NULL;
+    size_t count = 0;
+    int result = airgap_decoder_get_received_indices(_decoder, &indices, &count);
+
+    if (result != AIRGAP_OK || indices == NULL || count == 0) {
+        return [NSIndexSet indexSet];
+    }
+
+    NSMutableIndexSet *set = [NSMutableIndexSet indexSet];
+    for (size_t i = 0; i < count; i++) {
+        [set addIndex:indices[i]];
+    }
+    airgap_decoder_free_indices(indices, count);
+    return set;
+}
+
 - (void)reset {
     if (_decoder) {
         airgap_decoder_reset(_decoder);

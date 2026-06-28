@@ -41,6 +41,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) NSInteger sessionId;
 
 /**
+ * Indices of all chunks received so far (e.g. {0, 1, 3} means chunk 2 is missing)
+ */
+@property (nonatomic, readonly) NSIndexSet *receivedIndices;
+
+/**
  * Process a QR code string
  *
  * @param qrString The string data from a scanned QR code

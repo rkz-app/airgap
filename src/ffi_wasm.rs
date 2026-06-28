@@ -123,6 +123,12 @@ impl WasmDecoder {
             .map_err(|e| JsError::new(&e.to_string()))
     }
 
+    /// Get indices of all received chunks (e.g. [0, 1, 3] means chunk 2 is missing).
+    #[wasm_bindgen]
+    pub fn received_indices(&self) -> Vec<u16> {
+        self.inner.received_indices().collect()
+    }
+
     /// Reset decoder state to start a new session.
     #[wasm_bindgen]
     pub fn reset(&mut self) {

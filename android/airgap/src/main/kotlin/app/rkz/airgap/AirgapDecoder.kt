@@ -52,6 +52,16 @@ class AirgapDecoder : AutoCloseable {
         }
 
     /**
+     * Indices of all chunks received so far (e.g. [0, 1, 3] means chunk 2 is missing)
+     */
+    val receivedIndices: IntArray
+        get() {
+            checkNotClosed()
+            return nativeGetReceivedIndices(nativeHandle)
+                ?: IntArray(0)
+        }
+
+    /**
      * Get the decoding progress as a pair of (received, total)
      */
     val progress: Pair<Int, Int>
@@ -116,5 +126,6 @@ class AirgapDecoder : AutoCloseable {
     private external fun nativeGetSessionId(handle: Long): Int
     private external fun nativeProcessQr(handle: Long, qrString: String): QRResult?
     private external fun nativeGetData(handle: Long): ByteArray?
+    private external fun nativeGetReceivedIndices(handle: Long): IntArray?
     private external fun nativeReset(handle: Long)
 }

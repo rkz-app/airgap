@@ -61,6 +61,10 @@ impl Decoder {
         self.session_id
     }
 
+    pub fn received_indices(&self) -> impl Iterator<Item = u16> {
+        self.received_chunks.keys().copied()
+    }
+
     pub fn received_count(&self) -> usize {
         self.received_chunks.len()
     }
