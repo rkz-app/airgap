@@ -168,7 +168,7 @@ jobs:
         path: airgap-*.tgz
         if-no-files-found: error
 
-  build-embedded:
+  build-embedded-arm:
     runs-on: ubuntu-latest
 
     steps:
@@ -178,8 +178,9 @@ jobs:
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Add embedded targets
+    - name: Add ARM targets
       run: |
+        rustup target add thumbv8m.main-none-eabihf
         rustup target add thumbv7em-none-eabihf
         rustup target add thumbv7m-none-eabi
         rustup target add thumbv6m-none-eabi
@@ -193,21 +194,132 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
-        key: ${{ runner.os }}-cargo-embedded-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-arm-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
-          ${{ runner.os }}-cargo-embedded-
+          ${{ runner.os }}-cargo-arm-
 
-    - name: Build embedded libraries
+    - name: Build ARM Cortex-M libraries
       run: |
-        chmod +x build-embedded.sh
-        ./build-embedded.sh
+        chmod +x build-arm.sh
+        ./build-arm.sh
 
-    - name: Create archive
+    - name: Upload ARM artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: airgap-embedded-arm
+        path: target/arm/
+        if-no-files-found: error
+
+  build-embedded-macos:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-macos-sim-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-macos-sim-
+
+    - name: Build macOS simulator library
       run: |
-        cd target/embedded
-        tar czf ../../airgap-embedded.tar.gz *.a airgap.h
+        chmod +x build-sim.sh
+        ./build-sim.sh
 
-    - name: Upload embedded artifact
+    - name: Upload macOS artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: airgap-embedded-macos
+        path: target/sim/
+        if-no-files-found: error
+
+  build-embedded-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install ARM64 cross-compiler
+      run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-aarch64-linux-gnu
+
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-linux-sim-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-linux-sim-
+
+    - name: Build Linux simulator library
+      run: |
+        chmod +x build-sim.sh
+        ./build-sim.sh
+
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: airgap-embedded-linux
+        path: target/sim/
+        if-no-files-found: error
+
+  aggregate-embedded:
+    needs: [build-embedded-arm, build-embedded-macos, build-embedded-linux]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download ARM artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: airgap-embedded-arm
+        path: arm
+
+    - name: Download macOS artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: airgap-embedded-macos
+        path: macos
+
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: airgap-embedded-linux
+        path: linux
+
+    - name: Aggregate into single folder
+      run: |
+        mkdir -p aggregate
+        cp arm/*.a aggregate/
+        cp macos/*.a aggregate/
+        cp linux/*.a aggregate/
+        # Header is identical across all builds
+        cp arm/airgap.h aggregate/
+        cd aggregate
+        tar czf ../airgap-embedded.tar.gz *
+        ls -la
+        cd ..
+
+    - name: Upload aggregated embedded artifact
       uses: actions/upload-artifact@v4
       with:
         name: airgap-embedded
@@ -215,7 +327,7 @@ jobs:
         if-no-files-found: error
 
   create-release:
-    needs: [build-android, build-ios, build-js, build-embedded]
+    needs: [build-android, build-ios, build-js, aggregate-embedded]
     runs-on: ubuntu-latest
 
     steps:
