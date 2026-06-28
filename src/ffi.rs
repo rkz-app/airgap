@@ -223,29 +223,30 @@ pub unsafe extern "C" fn airgap_decoder_get_session_id(decoder: *const AirgapDec
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn airgap_decoder_get_received_indices(
     decoder: *const AirgapDecoder,
-    out_indices: *mut *mut u16,
-    out_count: *mut usize,
+    bitmap: *mut u8,
+    bitmap_size: usize,
 ) -> c_int {
-    if decoder.is_null() || out_indices.is_null() || out_count.is_null() {
+    if decoder.is_null() || bitmap.is_null() {
         return -1;
     }
 
-    let mut indices: Vec<u16> = (*(decoder as *const Decoder)).received_indices().collect();
-    indices.shrink_to_fit();
-    *out_count = indices.len();
-    *out_indices = indices.as_mut_ptr();
-    core::mem::forget(indices);
-    0
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn airgap_decoder_free_indices(
-    indices: *mut u16,
-    count: usize,
-) {
-    if !indices.is_null() {
-        let _ = Vec::from_raw_parts(indices, count, count);
+    let d = &*(decoder as *const Decoder);
+    let total = d.total_count();
+    let req = (total + 7) / 8;
+    if bitmap_size < req {
+        return -1;
     }
+
+    // Zero the bitmap
+    core::ptr::write_bytes(bitmap, 0, req);
+
+    // Set bits for received indices
+    for idx in d.received_indices() {
+        let byte = idx as usize / 8;
+        let bit = idx as usize % 8;
+        unsafe { *bitmap.add(byte) |= 1u8 << bit; }
+    }
+    0
 }
 
 #[unsafe(no_mangle)]

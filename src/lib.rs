@@ -90,6 +90,58 @@ mod tests {
     }
 
     #[test]
+    fn test_received_indices() {
+        let data = vec![0xAB; 1500];
+        let encoder = Encoder::new(&data, 500).unwrap();
+        assert_eq!(encoder.chunk_count(), 3);
+
+        let mut decoder = Decoder::new();
+
+        // Scan first two chunks, skip the last
+        decoder.process_qr_string(&encoder.get_qr_string(0).unwrap()).unwrap();
+        decoder.process_qr_string(&encoder.get_qr_string(1).unwrap()).unwrap();
+
+        assert!(!decoder.is_complete());
+
+        let indices: Vec<u16> = decoder.received_indices().collect();
+        assert_eq!(indices, vec![0, 1]);
+
+        // Scan the last chunk
+        decoder.process_qr_string(&encoder.get_qr_string(2).unwrap()).unwrap();
+        assert!(decoder.is_complete());
+
+        let all_indices: Vec<u16> = decoder.received_indices().collect();
+        assert_eq!(all_indices, vec![0, 1, 2]);
+
+        let decoded = decoder.get_data().unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_received_indices_gaps() {
+        let data = vec![0xCD; 800];
+        let encoder = Encoder::new(&data, 200).unwrap();
+        assert_eq!(encoder.chunk_count(), 4);
+
+        let mut decoder = Decoder::new();
+
+        // Scan chunks out of order with a gap
+        decoder.process_qr_string(&encoder.get_qr_string(3).unwrap()).unwrap();
+        decoder.process_qr_string(&encoder.get_qr_string(0).unwrap()).unwrap();
+        decoder.process_qr_string(&encoder.get_qr_string(1).unwrap()).unwrap();
+
+        let indices: Vec<u16> = decoder.received_indices().collect();
+        assert_eq!(indices, vec![0, 1, 3]);
+
+        // Fill the gap
+        decoder.process_qr_string(&encoder.get_qr_string(2).unwrap()).unwrap();
+        assert!(decoder.is_complete());
+
+        let decoded = decoder.get_data().unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
     #[cfg(feature = "qr")]
     fn test_ml_kem_key() {
 
