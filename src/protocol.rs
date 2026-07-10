@@ -3,10 +3,10 @@ use crate::error::AirgapError;
 
 pub const MAGIC: [u8; 2] = [0x19, 0xF7];
 pub const VERSION: u8 = 1;
-pub const HEADER_SIZE: usize = 16;
-pub const MAX_CHUNK_SIZE: usize = 1920;
-pub const RECOMMENDED_MAX_CHUNK_SIZE: usize = 1100;
-pub const MIN_CHUNK_SIZE: usize = 16;
+pub const AIRGAP_HEADER_SIZE: usize = 16;
+pub const AIRGAP_MAX_CHUNK_SIZE: usize = 1920;
+pub const AIRGAP_RECOMMENDED_MAX_CHUNK_SIZE: usize = 1100;
+pub const AIRGAP_MIN_CHUNK_SIZE: usize = 16;
 
 #[derive(Debug, Clone)]
 pub struct Chunk {
@@ -24,10 +24,10 @@ impl Chunk {
         data: Vec<u8>,
     ) -> Result<Self, AirgapError> {
         // Validate chunk data size
-        if data.len() > MAX_CHUNK_SIZE {
+        if data.len() > AIRGAP_MAX_CHUNK_SIZE {
             return Err(AirgapError::ChunkSizeTooLarge(
                 data.len(),
-                MAX_CHUNK_SIZE,
+                AIRGAP_MAX_CHUNK_SIZE,
             ));
         }
 
@@ -70,7 +70,7 @@ impl Chunk {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AirgapError> {
 
-        if bytes.len() < HEADER_SIZE + 4 {
+        if bytes.len() < AIRGAP_HEADER_SIZE + 4 {
             return Err(AirgapError::EncodingError(
                 "Chunk too small".into()
             ));
@@ -97,14 +97,14 @@ impl Chunk {
         }
 
         // Validate data length
-        if data_len > MAX_CHUNK_SIZE {
+        if data_len > AIRGAP_MAX_CHUNK_SIZE {
             return Err(AirgapError::ChunkSizeTooLarge(
                 data_len,
-                MAX_CHUNK_SIZE,
+                AIRGAP_MAX_CHUNK_SIZE,
             ));
         }
 
-        let data_start = HEADER_SIZE;
+        let data_start = AIRGAP_HEADER_SIZE;
         let data_end = data_start + data_len;
 
         if bytes.len() < data_end + 4 {

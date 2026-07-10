@@ -142,6 +142,59 @@ mod tests {
     }
 
     #[test]
+    fn test_is_available() {
+        let data = vec![0xAA; 1500];
+        let encoder = Encoder::new(&data, 500).unwrap();
+        assert_eq!(encoder.chunk_count(), 3);
+
+        let mut decoder = Decoder::new();
+
+        // Before any chunk, is_available returns false for everything
+        assert!(!decoder.is_available(0));
+        assert!(!decoder.is_available(1));
+        assert!(!decoder.is_available(2));
+
+        // Process chunk 0
+        decoder.process_qr_string(&encoder.get_qr_string(0).unwrap()).unwrap();
+        assert!(decoder.is_available(0));
+        assert!(!decoder.is_available(1));
+        assert!(!decoder.is_available(2));
+
+        // Process chunk 2 (skip chunk 1)
+        decoder.process_qr_string(&encoder.get_qr_string(2).unwrap()).unwrap();
+        assert!(decoder.is_available(0));
+        assert!(!decoder.is_available(1));
+        assert!(decoder.is_available(2));
+
+        // Process chunk 1
+        decoder.process_qr_string(&encoder.get_qr_string(1).unwrap()).unwrap();
+        assert!(decoder.is_available(0));
+        assert!(decoder.is_available(1));
+        assert!(decoder.is_available(2));
+        assert!(decoder.is_complete());
+
+        let decoded = decoder.get_data().unwrap();
+        assert_eq!(data, decoded);
+    }
+
+    #[test]
+    fn test_is_available_after_reset() {
+        let data = vec![0xBB; 1000];
+        let encoder = Encoder::new(&data, 500).unwrap();
+        assert_eq!(encoder.chunk_count(), 2);
+
+        let mut decoder = Decoder::new();
+
+        decoder.process_qr_string(&encoder.get_qr_string(0).unwrap()).unwrap();
+        assert!(decoder.is_available(0));
+        assert!(!decoder.is_available(1));
+
+        decoder.reset();
+        assert!(!decoder.is_available(0));
+        assert!(!decoder.is_available(1));
+    }
+
+    #[test]
     #[cfg(feature = "qr")]
     fn test_ml_kem_key() {
 

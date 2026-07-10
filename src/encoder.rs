@@ -53,24 +53,24 @@ impl Encoder {
         }
 
         // Validate chunk size
-        if chunk_size < MIN_CHUNK_SIZE {
-            return Err(AirgapError::ChunkSizeTooSmall(chunk_size, MIN_CHUNK_SIZE));
+        if chunk_size < AIRGAP_MIN_CHUNK_SIZE {
+            return Err(AirgapError::ChunkSizeTooSmall(chunk_size, AIRGAP_MIN_CHUNK_SIZE));
         }
 
-        if chunk_size > MAX_CHUNK_SIZE {
+        if chunk_size > AIRGAP_MAX_CHUNK_SIZE {
             return Err(AirgapError::ChunkSizeTooLarge(
                 chunk_size,
-                MAX_CHUNK_SIZE,
+                AIRGAP_MAX_CHUNK_SIZE,
             ));
         }
 
         // Warn if using very large chunk size (won't scan well)
         #[cfg(feature = "std")]
-        if chunk_size > RECOMMENDED_MAX_CHUNK_SIZE {
+        if chunk_size > AIRGAP_RECOMMENDED_MAX_CHUNK_SIZE {
             eprintln!(
                 "Warning: chunk size {} exceeds recommended maximum {}. \
                  QR codes may be difficult to scan.",
-                chunk_size, RECOMMENDED_MAX_CHUNK_SIZE
+                chunk_size, AIRGAP_RECOMMENDED_MAX_CHUNK_SIZE
             );
         }
 

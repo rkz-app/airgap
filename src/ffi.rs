@@ -221,32 +221,14 @@ pub unsafe extern "C" fn airgap_decoder_get_session_id(decoder: *const AirgapDec
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn airgap_decoder_get_received_indices(
+pub unsafe extern "C" fn airgap_decoder_is_available(
     decoder: *const AirgapDecoder,
-    bitmap: *mut u8,
-    bitmap_size: usize,
-) -> c_int {
-    if decoder.is_null() || bitmap.is_null() {
-        return -1;
+    index: u16,
+) -> bool {
+    if decoder.is_null() {
+        return false;
     }
-
-    let d = &*(decoder as *const Decoder);
-    let total = d.total_count();
-    let req = (total + 7) / 8;
-    if bitmap_size < req {
-        return -1;
-    }
-
-    // Zero the bitmap
-    core::ptr::write_bytes(bitmap, 0, req);
-
-    // Set bits for received indices
-    for idx in d.received_indices() {
-        let byte = idx as usize / 8;
-        let bit = idx as usize % 8;
-        unsafe { *bitmap.add(byte) |= 1u8 << bit; }
-    }
-    0
+    (*(decoder as *const Decoder)).is_available(index)
 }
 
 #[unsafe(no_mangle)]

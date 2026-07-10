@@ -7,6 +7,7 @@ use crate::error::AirgapError;
 
 pub struct Decoder {
     received_chunks: BTreeMap<u16, Vec<u8>>,
+    availability: Vec<bool>,
     session_id: Option<u32>,
     total_chunks: Option<u16>,
 }
@@ -15,6 +16,7 @@ impl Decoder {
     pub fn new() -> Self {
         Self {
             received_chunks: BTreeMap::new(),
+            availability: Vec::new(),
             session_id: None,
             total_chunks: None,
         }
@@ -34,6 +36,8 @@ impl Decoder {
         if self.session_id.is_none() {
             self.session_id = Some(chunk.session_id);
             self.total_chunks = Some(chunk.total_chunks);
+            // Allocate availability vec lazily
+            self.availability = alloc::vec![false; chunk.total_chunks as usize];
         }
 
         if self.total_chunks.unwrap() != chunk.total_chunks {
@@ -46,6 +50,9 @@ impl Decoder {
 
         // Store chunk data
         self.received_chunks.insert(chunk.chunk_index, chunk.data.clone());
+        if let Some(available) = self.availability.get_mut(chunk.chunk_index as usize) {
+            *available = true;
+        }
 
         Ok(chunk)
     }
@@ -73,6 +80,12 @@ impl Decoder {
         self.total_chunks.unwrap_or(0) as usize
     }
 
+    /// Check if a specific chunk index has been received.
+    /// Returns false before the first chunk is processed (total_chunks unknown).
+    pub fn is_available(&self, index: u16) -> bool {
+        self.availability.get(index as usize).copied().unwrap_or(false)
+    }
+
     /// Get reassembled data
     pub fn get_data(&self) -> Result<Vec<u8>, AirgapError> {
         if !self.is_complete() {
@@ -95,6 +108,7 @@ impl Decoder {
     }
     pub fn reset(&mut self) {
         self.received_chunks.clear();
+        self.availability.clear();
         self.session_id = None;
         self.total_chunks = None;
     }

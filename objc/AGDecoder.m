@@ -55,24 +55,12 @@ static NSString *const AGDecoderErrorDomain = @"app.rkz.airgap.decoder";
     NSUInteger total = airgap_decoder_get_total(_decoder);
     if (total == 0) return [NSIndexSet indexSet];
 
-    size_t bitmapSize = (total + 7) / 8;
-    uint8_t *bitmap = malloc(bitmapSize);
-    if (!bitmap) return [NSIndexSet indexSet];
-    memset(bitmap, 0, bitmapSize);
-
-    int result = airgap_decoder_get_received_indices(_decoder, bitmap, bitmapSize);
-    if (result != AIRGAP_OK) {
-        free(bitmap);
-        return [NSIndexSet indexSet];
-    }
-
     NSMutableIndexSet *set = [[NSMutableIndexSet alloc] init];
     for (NSUInteger i = 0; i < total; i++) {
-        if (bitmap[i / 8] & (1 << (i % 8))) {
+        if (airgap_decoder_is_available(_decoder, (uint16_t)i)) {
             [set addIndex:i];
         }
     }
-    free(bitmap);
     return set;
 }
 
