@@ -17,26 +17,43 @@ extern crate std;
 #[global_allocator]
 static GLOBAL: std::alloc::System = std::alloc::System;
 
-// Stub allocator + panic handler for CI builds targeting embedded.
-// Produces a linkable .a — real firmware must provide its own.
+// Allocator for embedded targets that have a C runtime (newlib, etc.).
+// Delegates to the C library's `malloc`/`free`/`realloc` via FFI.
+// Also provides a panic handler for bare-metal targets.
 #[cfg(all(
     not(feature = "std"),
     not(target_arch = "wasm32"),
     target_os = "none"
 ))]
-mod ci_stubs {
+mod c_alloc {
     use core::alloc::{GlobalAlloc, Layout};
     use core::panic::PanicInfo;
+    use core::ffi::c_void;
 
-    struct CiAlloc;
-    unsafe impl GlobalAlloc for CiAlloc {
-        unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
-            core::ptr::null_mut()
-        }
-        unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}
+    unsafe extern "C" {
+        fn malloc(size: usize) -> *mut c_void;
+        fn free(ptr: *mut c_void);
+        fn realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
     }
+
+    struct CHeap;
+
+    unsafe impl GlobalAlloc for CHeap {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            malloc(layout.size() as usize) as *mut u8
+        }
+
+        unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
+            free(ptr as *mut c_void)
+        }
+
+        unsafe fn realloc(&self, ptr: *mut u8, _layout: Layout, new_size: usize) -> *mut u8 {
+            realloc(ptr as *mut c_void, new_size) as *mut u8
+        }
+    }
+
     #[global_allocator]
-    static GLOBAL: CiAlloc = CiAlloc;
+    static HEAP: CHeap = CHeap;
 
     #[panic_handler]
     fn panic(_info: &PanicInfo) -> ! {
