@@ -22,7 +22,7 @@ do
   echo ""
   echo "Building for ${triple}..."
   rustup target add "${triple}" 2>/dev/null || true
-  cargo build --release --no-default-features --target "${triple}"
+  cargo build --release --no-default-features --target "${triple}"  --config 'rustflags="-C panic=abort"'
   name="${triple%%-none-eabi*}"
   name="${name%%-none-eabihf*}"
   cp "target/${triple}/release/libairgap.a" "${OUTPUT_DIR}/libairgap-${name}.a"
